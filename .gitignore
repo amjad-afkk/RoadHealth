@@ -1,0 +1,47 @@
+# ============================================================
+# RoadHealth GitIgnore Rules
+# Protect secrets, binaries, dependencies, and OS temp files
+# ============================================================
+
+# 1. Dependency Directories
+node_modules/
+**/node_modules/
+
+# 2. Environment Variables & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+**/.env
+
+# 3. SQLite Database Files & WAL Logs
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+**/db/*.db
+**/db/*.db-wal
+**/db/*.db-shm
+
+# 4. Log Files & Debugging
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 5. OS & Editor Specific Files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 6. Temporary Files
+tmp/
+temp/

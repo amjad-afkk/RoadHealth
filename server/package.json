@@ -1,0 +1,17 @@
+{
+  "name": "roadhealth-server",
+  "version": "1.0.0",
+  "description": "RoadHealth IoT Backend — ESP32 telemetry ingestion, pothole detection, and real-time WebSocket hub",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}
