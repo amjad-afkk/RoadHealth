@@ -40,13 +40,22 @@ router.post('/', (req, res) => {
 
         const db = getDb();
 
-        // Check if device exists
-        const device = db.prepare('SELECT id FROM devices WHERE id = ?').get(body.deviceId);
+        // Check if device exists, if not auto-register on first telemetry packet
+        let device = db.prepare('SELECT id FROM devices WHERE id = ?').get(body.deviceId);
         if (!device) {
-            return res.status(404).json({
-                success: false,
-                error: `Unknown device: ${body.deviceId}`
+            // Auto-generate plate from deviceId (e.g. 'ESP32-NODE-TS09-EA-4412' -> 'TS 09 EA 4412')
+            const parts = body.deviceId.split('-');
+            const plate = parts.length >= 4 ? `${parts[2]} ${parts[3]}` : body.deviceId;
+
+            db.prepare(`
+                INSERT INTO devices (id, bike_plate, bike_model, rider_name, location, battery_pct, status)
+                VALUES (@id, @bike_plate, 'ESP32 Patrol Node', 'Active Hardware Unit', 'Live GPS Field Data', 100, 'Active')
+            `).run({
+                id: body.deviceId,
+                bike_plate: plate
             });
+
+            console.log(`[Telemetry] Auto-registered new ESP32 node: ${body.deviceId} (Plate: ${plate})`);
         }
 
         // Extract accelerometer and gyroscope values
