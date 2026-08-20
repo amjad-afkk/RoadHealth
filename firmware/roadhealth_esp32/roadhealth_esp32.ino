@@ -40,8 +40,8 @@
 const char* WIFI_SSID     = "YOUR_WIFI_SSID";
 const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
 
-// Backend Server URL
-const char* SERVER_URL = "http://YOUR_SERVER_IP:8000/api/v1/telemetry";
+// Backend Server URL (Render 24/7 Cloud Host)
+const char* SERVER_URL = "https://roadhealth.onrender.com/api/v1/telemetry";
 
 // Device Identity (must match a device ID in the server database)
 const char* DEVICE_ID = "ESP32-NODE-TS09-EA-4412";

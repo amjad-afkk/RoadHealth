@@ -678,7 +678,9 @@ async function connectLiveBackend() {
 let wsConnection = null;
 
 function connectWebSocket() {
-    const wsUrl = 'ws://localhost:8000';
+    const wsUrl = window.location.protocol === 'https:'
+        ? 'wss://roadhealth.onrender.com'
+        : (window.location.hostname === 'localhost' ? 'ws://localhost:8000' : 'wss://roadhealth.onrender.com');
     console.log(`[WS] Connecting to ${wsUrl}...`);
 
     try {

@@ -11,7 +11,7 @@ class RoadHealthAPI {
     constructor() {
         this.config = {
             mode: 'nodejs',
-            baseUrl: 'http://localhost:8000/api/v1',
+            baseUrl: 'https://roadhealth.onrender.com/api/v1',
             timeoutMs: 8000
         };
     }
