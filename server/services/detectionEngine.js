@@ -1,8 +1,8 @@
 const { isPostGIS, getPool, getDb } = require('../db/database');
 
 const CONFIG = {
-    Z_SPIKE_THRESHOLD_G: 4.2,
-    IRI_CRITICAL_THRESHOLD: 4.5,
+    Z_SPIKE_THRESHOLD_G: 2.2,
+    IRI_CRITICAL_THRESHOLD: 6.0,
     IRI_MODERATE_THRESHOLD: 2.5,
     DEDUP_RADIUS_M: 10,
     GRAVITY: 9.81,
@@ -16,7 +16,7 @@ async function analyzeTelemetry(telemetryRow) {
     const zDeviation = Math.abs((accel_z || CONFIG.GRAVITY) - CONFIG.GRAVITY);
     const gForce = zDeviation / CONFIG.GRAVITY;
 
-    const isSpikeDetected = gForce >= (CONFIG.Z_SPIKE_THRESHOLD_G - 1);
+    const isSpikeDetected = gForce >= CONFIG.Z_SPIKE_THRESHOLD_G;
     const iriValue = iri_estimate || estimateIRI(vibration_mag);
     const isHighIRI = iriValue >= CONFIG.IRI_MODERATE_THRESHOLD;
 
@@ -27,7 +27,7 @@ async function analyzeTelemetry(telemetryRow) {
     let severity = 'moderate';
     let estimatedDepth = 0;
 
-    if (gForce >= (CONFIG.Z_SPIKE_THRESHOLD_G - 1) || iriValue >= CONFIG.IRI_CRITICAL_THRESHOLD) {
+    if (gForce >= CONFIG.Z_SPIKE_THRESHOLD_G || iriValue >= CONFIG.IRI_CRITICAL_THRESHOLD) {
         severity = 'critical';
         estimatedDepth = Math.round(gForce * 2.0 * 10) / 10;
     } else {
@@ -45,6 +45,9 @@ async function analyzeTelemetry(telemetryRow) {
                     iri = GREATEST(iri, $1),
                     depth_cm = GREATEST(depth_cm, $2),
                     severity = CASE WHEN $3 = 'critical' THEN 'critical' ELSE severity END,
+                    confidence = 1.0,
+                    last_hit_at = NOW(),
+                    status = CASE WHEN status = 'decayed_expired' THEN 'reported' ELSE status END,
                     updated_at = NOW()
                 WHERE id = $4
             `, [iriValue, estimatedDepth, severity, existing.id]);
@@ -60,12 +63,13 @@ async function analyzeTelemetry(telemetryRow) {
                 potholeId: existing.id,
                 lat, lng, severity, iri: iriValue, depth_cm: estimatedDepth,
                 cluster_size: existing.cluster_size + 1,
+                confidence: 1.0,
                 device_id
             };
         } else {
             const insertRes = await pool.query(`
-                INSERT INTO potholes (lat, lng, geom, severity, iri, depth_cm, cluster_size, source_device, telemetry_id, status)
-                VALUES ($1, $2, ST_SetSRID(ST_MakePoint($2, $1), 4326), $3, $4, $5, 1, $6, $7, 'reported')
+                INSERT INTO potholes (lat, lng, geom, severity, iri, depth_cm, cluster_size, confidence, last_hit_at, half_life_days, source_device, telemetry_id, status)
+                VALUES ($1, $2, ST_SetSRID(ST_MakePoint($2, $1), 4326), $3, $4, $5, 1, 1.0, NOW(), 14.0, $6, $7, 'reported')
                 RETURNING id
             `, [lat, lng, severity, iriValue, estimatedDepth, device_id, id]);
 
@@ -82,6 +86,7 @@ async function analyzeTelemetry(telemetryRow) {
                 potholeId: newId,
                 lat, lng, severity, iri: iriValue, depth_cm: estimatedDepth,
                 cluster_size: 1,
+                confidence: 1.0,
                 device_id
             };
         }
@@ -94,6 +99,9 @@ async function analyzeTelemetry(telemetryRow) {
                     iri = MAX(iri, @iri),
                     depth_cm = MAX(depth_cm, @depth_cm),
                     severity = CASE WHEN @severity = 'critical' THEN 'critical' ELSE severity END,
+                    confidence = 1.0,
+                    last_hit_at = datetime('now'),
+                    status = CASE WHEN status = 'decayed_expired' THEN 'reported' ELSE status END,
                     updated_at = datetime('now')
                 WHERE id = @id
             `).run({
@@ -115,12 +123,13 @@ async function analyzeTelemetry(telemetryRow) {
                 potholeId: existing.id,
                 lat, lng, severity, iri: iriValue, depth_cm: estimatedDepth,
                 cluster_size: existing.cluster_size + 1,
+                confidence: 1.0,
                 device_id
             };
         } else {
             const result = db.prepare(`
-                INSERT INTO potholes (lat, lng, severity, iri, depth_cm, cluster_size, source_device, telemetry_id, status)
-                VALUES (@lat, @lng, @severity, @iri, @depth_cm, 1, @source_device, @telemetry_id, 'reported')
+                INSERT INTO potholes (lat, lng, severity, iri, depth_cm, cluster_size, confidence, last_hit_at, half_life_days, source_device, telemetry_id, status)
+                VALUES (@lat, @lng, @severity, @iri, @depth_cm, 1, 1.0, datetime('now'), 14.0, @source_device, @telemetry_id, 'reported')
             `).run({
                 lat, lng, severity,
                 iri: iriValue,

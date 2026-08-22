@@ -3,28 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RoadHealth — Telangana IoT Road Intelligence & Satellite Navigation</title>
-    <meta name="description" content="Next-generation IoT road surface intelligence, PostGIS spatial database, real-time roughness indexing, and multi-basemap navigation platform.">
+    <title>RoadHealth — ESP32 IoT Road Intelligence & Satellite GIS Platform</title>
+    <meta name="description" content="Real-time ESP32 MPU6500 IoT road surface monitoring, PostGIS spatial database, automated pothole detection, and multi-basemap navigation platform.">
 
-    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
 
-    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 
-    
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div id="app-container">
         
         <header class="top-nav-bar" id="main-header">
-            
             <div class="nav-cluster">
                 <div class="glass-pill brand-pill">
                     <div class="brand-icon-wrap">
@@ -32,114 +27,101 @@
                     </div>
                     <div class="brand-title">
                         RoadHealth
-                        <span class="brand-badge" id="backendBadge">PostGIS 3.4</span>
+                        <span class="brand-badge" id="backendBadge">PostGIS 3.3</span>
                     </div>
                 </div>
             </div>
 
-            
             <div class="nav-cluster">
                 <nav class="nav-menu-bar" aria-label="Main Navigation">
                     <button class="nav-tab-btn active" id="tab-search" onclick="toggleRoutePanel()">
-                        <i data-lucide="search" style="width: 16px; height: 16px;"></i>
-                        <span>Plan Route</span>
+                        <i data-lucide="navigation-2" style="width: 15px; height: 15px;"></i>
+                        <span>Route Planner</span>
                     </button>
-                    <button class="nav-tab-btn" id="tab-hazards" onclick="toggleHazardPins()">
-                        <i data-lucide="alert-triangle" style="width: 16px; height: 16px;"></i>
+                    <button class="nav-tab-btn active" id="tab-hazards" onclick="toggleHazardPins()">
+                        <i data-lucide="alert-triangle" style="width: 15px; height: 15px; color: #EF4444;"></i>
                         <span>Potholes</span>
                     </button>
                     <button class="nav-tab-btn" id="tab-heatmap" onclick="toggleHeatmapLayer()">
-                        <i data-lucide="flame" style="width: 16px; height: 16px; color: #F59E0B;"></i>
+                        <i data-lucide="flame" style="width: 15px; height: 15px; color: #F59E0B;"></i>
                         <span>Heatmap</span>
                     </button>
-                    <button class="nav-tab-btn" id="tab-voice" onclick="toggleVoiceAlerts()">
-                        <i data-lucide="volume-2" style="width: 16px; height: 16px; color: #10B981;" id="voiceIcon"></i>
+                    <button class="nav-tab-btn active" id="tab-voice" onclick="toggleVoiceAlerts()">
+                        <i data-lucide="volume-2" style="width: 15px; height: 15px; color: #10B981;" id="voiceIcon"></i>
                         <span id="voiceLabel">Voice: ON</span>
                     </button>
-                    <button class="nav-tab-btn" id="tab-sensor" onclick="toggleSensorDrawer()">
-                        <i data-lucide="cpu" style="width: 16px; height: 16px;"></i>
-                        <span>Live IoT Node</span>
+                    <button class="nav-tab-btn active" id="tab-sensor" onclick="toggleSensorDrawer()">
+                        <i data-lucide="cpu" style="width: 15px; height: 15px; color: #007AFF;"></i>
+                        <span>ESP32 Telemetry</span>
                     </button>
 
-                    
                     <div class="settings-menu-container" id="settingsMenuContainer">
                         <button class="nav-tab-btn settings-btn" id="settingsMenuBtn" onclick="toggleSettingsDropdown(event)">
-                            <i data-lucide="layers" style="width: 16px; height: 16px;"></i>
-                            <span>Layers</span>
-                            <i data-lucide="chevron-down" class="dropdown-caret" style="width: 14px; height: 14px;"></i>
+                            <i data-lucide="layers" style="width: 15px; height: 15px;"></i>
+                            <span>Map Layers</span>
+                            <i data-lucide="chevron-down" class="dropdown-caret" style="width: 13px; height: 13px;"></i>
                         </button>
 
-                        
                         <div class="settings-dropdown-menu" id="settingsDropdown">
-                            <div class="dropdown-header">Satellite &amp; Vector Basemaps</div>
+                            <div class="dropdown-header">Basemap Style</div>
                             <button class="dropdown-item" onclick="toggleMapTheme('google-satellite')">
-                                <i data-lucide="globe" style="width: 16px; height: 16px; color: #007AFF;"></i>
+                                <i data-lucide="globe" style="width: 15px; height: 15px; color: #007AFF;"></i>
                                 <span>Google Hybrid Satellite</span>
-                                <span class="item-badge" id="badge-sat-active">Active</span>
                             </button>
                             <button class="dropdown-item" onclick="toggleMapTheme('esri-satellite')">
-                                <i data-lucide="satellite" style="width: 16px; height: 16px; color: #10B981;"></i>
-                                <span>Esri World Imagery (High-Res)</span>
+                                <i data-lucide="satellite" style="width: 15px; height: 15px; color: #10B981;"></i>
+                                <span>Esri High-Res Aerial</span>
                             </button>
                             <button class="dropdown-item" onclick="toggleMapTheme('street')">
-                                <i data-lucide="map" style="width: 16px; height: 16px;"></i>
-                                <span>CartoDB Positron Light</span>
+                                <i data-lucide="map" style="width: 15px; height: 15px; color: #64748B;"></i>
+                                <span>Carto Light Vector</span>
                             </button>
                             <button class="dropdown-item" onclick="toggleMapTheme('dark')">
-                                <i data-lucide="moon" style="width: 16px; height: 16px; color: #8B5CF6;"></i>
-                                <span>CartoDB Dark Matter</span>
+                                <i data-lucide="moon" style="width: 15px; height: 15px; color: #8B5CF6;"></i>
+                                <span>Carto Dark Matter</span>
                             </button>
 
-                            <div class="dropdown-header" style="margin-top: 8px;">Spatial Actions</div>
-                            <button class="dropdown-item" onclick="startVirtualBikeSimulation()">
-                                <i data-lucide="play" style="width: 16px; height: 16px; color: #10B981;"></i>
-                                <span>Simulate Virtual Patrol Bike</span>
+                            <div class="dropdown-header" style="margin-top: 8px;">Municipal GIS Tools</div>
+                            <button class="dropdown-item" onclick="openAdminModal()">
+                                <i data-lucide="shield-check" style="width: 15px; height: 15px; color: #8B5CF6;"></i>
+                                <span>Admin &amp; Fleet Dashboard</span>
                             </button>
                             <button class="dropdown-item" onclick="openExportModal()">
-                                <i data-lucide="download" style="width: 16px; height: 16px; color: #007AFF;"></i>
-                                <span>Export Municipal Report</span>
+                                <i data-lucide="download" style="width: 15px; height: 15px; color: #007AFF;"></i>
+                                <span>Export Defects (GeoJSON / CSV)</span>
                             </button>
                             <button class="dropdown-item" onclick="syncPostGISHook()">
-                                <i data-lucide="database" style="width: 16px; height: 16px; color: #6366F1;"></i>
-                                <span>PostGIS Stats &amp; Diagnostics</span>
-                            </button>
-                            <button class="dropdown-item admin-highlight" id="adminDashboardBtn" onclick="openAdminModal()">
-                                <i data-lucide="shield-alert" style="width: 16px; height: 16px; color: #EF4444;"></i>
-                                <span>Admin &amp; Fleet Dashboard</span>
-                                <span class="item-badge" style="background: #FEE2E2; color: #DC2626;">Admin</span>
+                                <i data-lucide="database" style="width: 15px; height: 15px; color: #10B981;"></i>
+                                <span>PostGIS Diagnostics</span>
                             </button>
                         </div>
                     </div>
                 </nav>
             </div>
 
-            
             <div class="nav-cluster">
                 <div class="glass-pill telemetry-status-pill">
                     <div class="status-pulse-dot"></div>
-                    <span id="telemetry-node-status">PostGIS Spatial Engine Active</span>
+                    <span id="telemetry-node-status">ESP32 Live Stream Active</span>
                 </div>
             </div>
         </header>
 
-        
         <main id="map-viewport">
             <div id="map"></div>
         </main>
 
-        
         <aside class="floating-route-search-card" id="floatingSearchCard" aria-label="Route Planning Search">
             <div class="search-card-header">
                 <div class="search-card-title">
                     <i data-lucide="navigation-2" style="width: 18px; height: 18px; color: var(--apple-blue);"></i>
-                    <span>Telangana Route Navigator</span>
+                    <span>Route Surface Intelligence</span>
                 </div>
                 <button class="panel-close-btn" onclick="toggleRoutePanel()" title="Minimize">
                     <i data-lucide="x" style="width: 15px; height: 15px;"></i>
                 </button>
             </div>
 
-            
             <div class="route-input-group-container">
                 <div class="input-route-connector">
                     <div class="connector-dot start"></div>
@@ -170,7 +152,6 @@
                 </button>
             </div>
 
-            
             <div class="preset-routes-bar">
                 <button class="preset-pill active" onclick="loadPresetRoute('hyd_airport')">
                     <i data-lucide="plane" style="width: 12px; height: 12px;"></i>
@@ -186,30 +167,24 @@
                 </button>
             </div>
 
-            
             <div class="alt-routes-container">
                 <div class="alt-routes-header" id="altRouteHeader">Available Route Options</div>
-                <div class="route-cards-list" id="routeCardList">
-                    
-                </div>
+                <div class="route-cards-list" id="routeCardList"></div>
             </div>
 
-            
             <button class="primary-search-btn" onclick="handleCustomRouteSearch()">
                 <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>
-                <span id="btnRouteText">Find Alternative Routes</span>
+                <span id="btnRouteText">Find Safest Routes</span>
             </button>
         </aside>
 
-        
         <div class="floating-route-summary-card" id="floatingSummaryCard">
             <div class="summary-card-header">
                 <div class="eta-time" id="summaryEtaTime">-- min</div>
                 <div class="distance-badge" id="summaryDistance">(-- km)</div>
-                <div class="health-dot-pill good" id="summaryScorePill">--%</div>
+                <div class="health-dot-pill good" id="summaryScorePill">--% Health</div>
             </div>
             <div class="summary-sub-detail" id="summaryPotholeCount">0 Potholes in PostGIS</div>
-            
             
             <div class="health-progress-bar">
                 <div class="seg-good" id="barSegGreen" style="width: 100%;"></div>
@@ -229,16 +204,23 @@
             </button>
         </div>
 
-        
         <aside class="iot-sensor-drawer" id="iotSensorCard">
             <div class="drawer-header">
                 <div class="drawer-title">
                     <div class="live-blink-dot"></div>
-                    <span>ESP32 Patrol Node Telemetry (100 Hz)</span>
+                    <div>
+                        <div style="font-weight: 700; font-size: 0.88rem;">ESP32-NODE-TS09-EA-4412</div>
+                        <div style="font-size: 0.72rem; color: var(--text-secondary); font-weight: 500;">MPU6500 100 Hz • TinyGPS++ 9600 Baud</div>
+                    </div>
                 </div>
                 <button class="panel-close-btn" onclick="toggleSensorDrawer()">
                     <i data-lucide="minus" style="width: 14px; height: 14px;"></i>
                 </button>
+            </div>
+
+            <div class="pothole-alert-banner" id="potholeAlertBanner">
+                <i data-lucide="shield-check" id="alertBannerIcon" style="width: 16px; height: 16px; color: #10B981;"></i>
+                <span id="alertBannerText">Road Surface Nominal (G-Force &lt; 2.2G)</span>
             </div>
 
             <div class="telemetry-metrics-grid">
@@ -251,7 +233,7 @@
                     <span class="metric-val highlight-iri" id="metric-iri">1.10 m/km</span>
                 </div>
                 <div class="metric-box">
-                    <span class="metric-label">Z-Axis G-Force</span>
+                    <span class="metric-label">Vertical Accel (Z)</span>
                     <span class="metric-val" id="metric-zacc">9.81 m/s²</span>
                 </div>
                 <div class="metric-box">
@@ -260,16 +242,31 @@
                 </div>
             </div>
 
+            <div class="telemetry-submetrics-row">
+                <div class="submetric-item">
+                    <span class="submetric-label">Accel X / Y</span>
+                    <span class="submetric-val" id="submetric-accel-xy">0.00 / 0.00 m/s²</span>
+                </div>
+                <div class="submetric-item">
+                    <span class="submetric-label">Gyro Pitch / Roll</span>
+                    <span class="submetric-val" id="submetric-gyro">0.0° / 0.0°</span>
+                </div>
+            </div>
+
             <div class="waveform-container">
                 <div class="waveform-header">
-                    <span>Live Vertical Accelerometer Z-Waveform (G-Spikes)</span>
-                    <span style="font-size: 0.68rem; color: var(--apple-blue);">100 Hz I2C</span>
+                    <span>MPU6500 100 Hz Vertical Z-Waveform</span>
+                    <span style="font-size: 0.68rem; color: var(--apple-blue); font-weight: 600;">Spike Threshold: 2.2G</span>
                 </div>
                 <canvas id="waveformCanvas"></canvas>
             </div>
+
+            <button class="btn-simulate-ride" onclick="startVirtualBikeSimulation()">
+                <i data-lucide="play" style="width: 14px; height: 14px;"></i>
+                <span>Simulate Patrol Bike Ride on Route</span>
+            </button>
         </aside>
 
-        
         <div class="route-roughness-drawer hidden" id="roughnessProfileDrawer">
             <div class="profile-drawer-header">
                 <div class="profile-title-wrap">
@@ -290,7 +287,6 @@
             </div>
         </div>
 
-        
         <div class="modal-backdrop" id="exportModalOverlay" onclick="closeExportModalOnBackdrop(event)">
             <div class="admin-modal-card" style="max-width: 500px;">
                 <div class="modal-header">
@@ -329,103 +325,43 @@
             </div>
         </div>
 
-        
         <div class="modal-backdrop" id="adminModalOverlay" onclick="closeAdminModalOnBackdrop(event)">
-            <div class="admin-modal-card">
+            <div class="admin-modal-card" style="max-width: 680px; width: 92vw; max-height: 85vh; display: flex; flex-direction: column;">
                 <div class="modal-header">
                     <div class="modal-title">
-                        <i data-lucide="shield-check" style="width: 20px; height: 20px; color: var(--apple-blue);"></i>
-                        <span>RoadHealth PostGIS Fleet &amp; Thresholds</span>
+                        <i data-lucide="shield-check" style="width: 20px; height: 20px; color: #8B5CF6;"></i>
+                        <span>Connected ESP32 Patrol Fleet &amp; Admin</span>
                     </div>
-                    <button class="panel-close-btn" onclick="closeAdminModal()">
-                        <i data-lucide="x" style="width: 16px; height: 16px;"></i>
-                    </button>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span class="brand-badge" id="adminFleetCountBadge" style="background: rgba(16, 185, 129, 0.12); color: #10B981;">5 Active Nodes</span>
+                        <button class="panel-close-btn" onclick="closeAdminModal()">
+                            <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                        </button>
+                    </div>
                 </div>
 
-                <div class="admin-modal-tabs">
-                    <button class="admin-tab-btn active" id="btnAdminTabFleet" onclick="switchAdminTab('fleet')">
-                        <i data-lucide="bike" style="width: 16px; height: 16px;"></i>
-                        <span id="fleetTabTitle">ESP32 Bike Fleet (5)</span>
-                    </button>
-                    <button class="admin-tab-btn" id="btnAdminTabSettings" onclick="switchAdminTab('settings')">
-                        <i data-lucide="sliders" style="width: 16px; height: 16px;"></i>
-                        <span>Detection Thresholds</span>
-                    </button>
-                    <button class="admin-tab-btn" id="btnAdminTabBackend" onclick="switchAdminTab('backend')">
-                        <i data-lucide="database" style="width: 16px; height: 16px;"></i>
-                        <span>PostGIS Diagnostics</span>
-                    </button>
-                </div>
-
-                <div class="modal-body">
-                    
-                    <div id="adminTabContentFleet" class="admin-tab-pane active">
-                        <div class="admin-section-title" style="display: flex; justify-content: space-between; align-items: center;">
-                            <span>Active ESP32 IoT Nodes Deployed on Bikes</span>
-                            <span id="fleetActiveCountBadge" style="font-size: 0.75rem; color: var(--health-good); font-weight: 600;">● 5 Nodes Connected</span>
-                        </div>
-                        <div class="esp32-fleet-grid" id="esp32FleetGrid"></div>
+                <div class="modal-body" style="padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;">
+                    <div style="font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary);">
+                        Active Connected IoT Patrol Nodes (MPU6500 &bull; NEO-6M)
                     </div>
 
-                    
-                    <div id="adminTabContentSettings" class="admin-tab-pane">
-                        <div class="admin-section-title">MPU6050 &amp; Roughness Thresholds</div>
-                        <div style="display: flex; flex-direction: column; gap: 16px;">
-                            <div class="form-group">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <label class="form-label" for="sliderIri">IRI Critical Roughness Limit (m/km)</label>
-                                    <span class="range-val-badge" id="valIri">4.5</span>
-                                </div>
-                                <input type="range" class="form-range" id="sliderIri" min="2.0" max="8.0" step="0.1" value="4.5" oninput="updateAdminVal('valIri', this.value)">
-                            </div>
-
-                            <div class="form-group">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <label class="form-label" for="sliderVib">Pothole Z-Accel Spike Trigger (G)</label>
-                                    <span class="range-val-badge" id="valVib">4.2</span>
-                                </div>
-                                <input type="range" class="form-range" id="sliderVib" min="1.5" max="7.0" step="0.1" value="4.2" oninput="updateAdminVal('valVib', this.value)">
-                            </div>
-                        </div>
-
-                        <div class="admin-section-title" style="margin-top: 18px;">Sensor Calibration</div>
-                        <div style="display: flex; gap: 10px;">
-                            <button class="pill-action-btn btn-secondary-apple" style="flex: 1;" onclick="resetCalibrationDefaults()">
-                                <i data-lucide="rotate-ccw" style="width: 15px; height: 15px;"></i>
-                                <span>Reset Defaults</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    
-                    <div id="adminTabContentBackend" class="admin-tab-pane">
-                        <div class="admin-section-title">PostGIS Spatial Database Status</div>
-                        <div style="background: #F8FAFC; border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; padding: 14px; display: flex; align-items: center; justify-content: space-between;">
-                            <div>
-                                <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary);">Supabase PostGIS Spatial Engine</div>
-                                <div style="font-size: 0.78rem; color: var(--text-secondary);" id="postgisStatusText">Status: PostGIS 3.3 Active (GiST Indexes Enabled)</div>
-                            </div>
-                            <button class="pill-action-btn btn-secondary-apple" style="font-size: 0.8rem; padding: 6px 14px;" onclick="syncPostGISHook()">
-                                <i data-lucide="refresh-cw" style="width: 14px; height: 14px;"></i>
-                                <span>Refresh Stats</span>
-                            </button>
-                        </div>
-                    </div>
+                    <div class="esp32-fleet-grid" id="adminFleetGrid"></div>
                 </div>
 
                 <div class="modal-footer">
+                    <button class="pill-action-btn btn-secondary-apple" onclick="refreshAdminFleet()">
+                        <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i>
+                        <span>Refresh Fleet</span>
+                    </button>
                     <button class="pill-action-btn btn-secondary-apple" onclick="closeAdminModal()">Close</button>
-                    <button class="pill-action-btn btn-primary-apple" onclick="saveAdminSettings()">Save Configuration</button>
                 </div>
             </div>
         </div>
     </div>
 
-    
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 
-    
     <script src="js/api.js"></script>
     <script src="js/healthEngine.js"></script>
     <script src="js/map.js"></script>

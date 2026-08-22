@@ -157,7 +157,7 @@ router.post('/', async (req, res) => {
 let activeSimulationInterval = null;
 
 router.post('/simulate', (req, res) => {
-    const { routeCoords, durationSec = 30, deviceId = 'ESP32-NODE-SIM-VIRTUAL' } = req.body;
+    const { routeCoords, durationSec = 30, deviceId = 'ESP32-NODE-TS09-EA-4412' } = req.body;
 
     if (activeSimulationInterval) {
         clearInterval(activeSimulationInterval);

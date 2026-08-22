@@ -302,6 +302,10 @@ class RoadHealthMap {
                 iconAnchor: [14, 14]
             });
 
+            const confidencePct = Math.round((p.confidence !== undefined ? p.confidence : 1.0) * 100);
+            const elapsed = p.elapsedDays !== undefined ? p.elapsedDays : 0;
+            const confidenceColor = confidencePct >= 70 ? '#10B981' : (confidencePct >= 40 ? '#F59E0B' : '#EF4444');
+
             const statusBadge = isRepaired
                 ? '<span style="background: #ECFDF5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700;">✅ Repaired</span>'
                 : `<span style="background: ${isCrit ? '#FEF2F2' : '#FFFBEB'}; color: ${isCrit ? '#DC2626' : '#D97706'}; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700;">${p.status.toUpperCase()}</span>`;
@@ -315,10 +319,11 @@ class RoadHealthMap {
                     <div style="font-weight: 700; font-size: 0.95rem; color: #1E293B;">
                         ${isCrit ? '🚨 Severe Pothole Impact' : '⚠️ Surface Degradation'}
                     </div>
-                    <div class="pothole-stats-row" style="margin: 8px 0; font-size: 0.8rem; display: flex; gap: 12px;">
+                    <div class="pothole-stats-row" style="margin: 8px 0; font-size: 0.8rem; display: flex; flex-wrap: wrap; gap: 10px;">
                         <div>IRI: <strong>${p.iri ? p.iri.toFixed(1) : '--'} m/km</strong></div>
                         <div>Est. Depth: <strong>${p.depthCm || 5} cm</strong></div>
-                        <div>Cluster: <strong>${p.clusterSize || 1} hits</strong></div>
+                        <div>Cluster: <strong>${p.clusterSize || 1} passes</strong></div>
+                        <div>Confidence: <strong style="color: ${confidenceColor};">${confidencePct}%</strong> (${elapsed > 0 ? elapsed + 'd ago' : 'Recent'})</div>
                     </div>
                     <div style="font-size: 0.72rem; color: #94A3B8; margin-bottom: 10px;">
                         Lat: ${p.lat.toFixed(5)}°N, Lng: ${p.lng.toFixed(5)}°E

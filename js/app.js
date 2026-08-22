@@ -28,8 +28,6 @@ const TELANGANA_PRESETS = {
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('[RoadHealth App] Initializing PostGIS IoT Road Intelligence Engine...');
-
     if (window.lucide) {
         lucide.createIcons();
     }
@@ -40,7 +38,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupAutocompleteListeners();
 
     await connectLiveBackend();
-    await renderESP32FleetGrid();
     await loadPresetRoute('hyd_airport');
 
     setupEventListeners();
@@ -103,7 +100,7 @@ async function handleCustomRouteSearch() {
         console.error('[RoadHealth] Route calculation failed:', err);
         alert('Failed to calculate route: ' + err.message);
     } finally {
-        if (btnText) btnText.innerText = 'Find Alternative Routes';
+        if (btnText) btnText.innerText = 'Find Safest Routes';
     }
 }
 
@@ -111,7 +108,6 @@ async function calculateAndRenderLiveRoutes(origin, dest) {
     const rawRoutesList = await window.roadHealthAPI.calculateMultipleRoutesBetween(origin, dest, origin.name, dest.name);
 
     if (!rawRoutesList || rawRoutesList.length === 0) {
-        console.warn('[RoadHealth] No routes returned by OSRM.');
         return;
     }
 
@@ -185,7 +181,7 @@ function renderAlternativeRouteCards(routes, selectedIndex = 0) {
         card.innerHTML = `
             <div class="route-item-header">
                 <div class="route-item-name">
-                    <span style="font-size: 0.72rem; color: var(--apple-blue); font-weight: 700; display: block;">Route Option ${idx + 1} ${idx === 0 ? '• Recommended (Best Surface)' : ''}</span>
+                    <span style="font-size: 0.72rem; color: var(--apple-blue); font-weight: 700; display: block;">Route Option ${idx + 1} ${idx === 0 ? '• Recommended (Smoothest Surface)' : ''}</span>
                     ${route.name}
                 </div>
                 <div class="route-health-score-badge ${scoreClass}">${route.compositeScore}% Health</div>
@@ -228,7 +224,7 @@ function updateFloatingSummaryCard(analyzed) {
     const scorePill = document.getElementById('summaryScorePill');
     const potholeEl = document.getElementById('summaryPotholeCount');
     if (scorePill) {
-        scorePill.innerText = `${analyzed.compositeScore}%`;
+        scorePill.innerText = `${analyzed.compositeScore}% Health`;
         scorePill.className = `health-dot-pill ${analyzed.compositeScore >= 80 ? 'good' : (analyzed.compositeScore >= 50 ? 'mod' : 'bad')}`;
     }
     if (potholeEl) {
@@ -367,9 +363,12 @@ function drawRouteProfileChart(route) {
 async function markPotholeRepaired(id) {
     const res = await window.roadHealthAPI.updatePotholeStatus(id, 'repaired', 'GHMC Road Maintenance Unit');
     if (res && res.success) {
-        toggleHazardPins(true);
-        if (AppState.showHeatmap) toggleHeatmapLayer();
-        speakHazardWarning('Pothole marked as repaired in PostGIS.');
+        await toggleHazardPins(true);
+        if (AppState.showHeatmap) await toggleHeatmapLayer();
+        speakHazardWarning('Pothole repaired. Road surface restored.');
+        if (AppState.originPoint && AppState.destPoint) {
+            await calculateAndRenderLiveRoutes(AppState.originPoint, AppState.destPoint);
+        }
     }
 }
 window.markPotholeRepaired = markPotholeRepaired;
@@ -377,7 +376,11 @@ window.markPotholeRepaired = markPotholeRepaired;
 async function flagPotholeFalsePositive(id) {
     const res = await window.roadHealthAPI.flagFalsePositive(id);
     if (res && res.success) {
-        toggleHazardPins(true);
+        await toggleHazardPins(true);
+        if (AppState.showHeatmap) await toggleHeatmapLayer();
+        if (AppState.originPoint && AppState.destPoint) {
+            await calculateAndRenderLiveRoutes(AppState.originPoint, AppState.destPoint);
+        }
     }
 }
 window.flagPotholeFalsePositive = flagPotholeFalsePositive;
@@ -395,7 +398,7 @@ async function startVirtualBikeSimulation() {
 
     const res = await window.roadHealthAPI.simulatePatrolBike(coords);
     if (res && res.success) {
-        speakHazardWarning('Starting virtual patrol bike simulation ride.');
+        speakHazardWarning('Simulating ESP32 patrol bike ride.');
         const container = document.getElementById('settingsMenuContainer');
         if (container) container.classList.remove('open');
     }
@@ -421,6 +424,139 @@ function downloadExport(format) {
     closeExportModal();
 }
 
+async function openAdminModal() {
+    document.getElementById('settingsMenuContainer')?.classList.remove('open');
+    const modal = document.getElementById('adminModalOverlay');
+    if (modal) modal.classList.add('active');
+    await refreshAdminFleet();
+}
+window.openAdminModal = openAdminModal;
+
+function closeAdminModal() {
+    document.getElementById('adminModalOverlay')?.classList.remove('active');
+}
+window.closeAdminModal = closeAdminModal;
+
+function closeAdminModalOnBackdrop(e) {
+    if (e.target.id === 'adminModalOverlay') closeAdminModal();
+}
+window.closeAdminModalOnBackdrop = closeAdminModalOnBackdrop;
+
+async function refreshAdminFleet() {
+    const fleet = await window.roadHealthAPI.getESP32Fleet();
+    renderAdminFleetList(fleet);
+}
+window.refreshAdminFleet = refreshAdminFleet;
+
+function renderAdminFleetList(devices) {
+    const grid = document.getElementById('adminFleetGrid');
+    const badge = document.getElementById('adminFleetCountBadge');
+    if (!grid) return;
+
+    if (!devices || devices.length === 0) {
+        if (badge) {
+            badge.innerText = '0 Active Nodes';
+            badge.style.background = 'rgba(100, 116, 139, 0.12)';
+            badge.style.color = '#64748B';
+        }
+        grid.innerHTML = `
+            <div style="background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 12px; padding: 24px 16px; text-align: center; color: var(--text-secondary); font-size: 0.84rem;">
+                <i data-lucide="radio" style="width: 24px; height: 24px; color: #94A3B8; margin-bottom: 8px; display: inline-block;"></i>
+                <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">No Active Hardware Nodes Connected</div>
+                <div>Power on ESP32 patrol nodes or stream live telemetry to dynamically register devices.</div>
+            </div>
+        `;
+        if (window.lucide) lucide.createIcons();
+        return;
+    }
+
+    if (badge) {
+        badge.innerText = `${devices.length} Active Nodes`;
+        badge.style.background = 'rgba(16, 185, 129, 0.12)';
+        badge.style.color = '#10B981';
+    }
+
+    grid.innerHTML = '';
+
+    devices.forEach(d => {
+        const card = document.createElement('div');
+        card.className = 'esp32-node-card';
+
+        const isOnline = d.sensors?.status === 'Active';
+        const statusColor = isOnline ? '#10B981' : '#F59E0B';
+
+        card.innerHTML = `
+            <div class="device-card-header">
+                <div class="device-node-title">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: ${statusColor};"></span>
+                    <span>${d.nodeId}</span>
+                </div>
+                <span class="device-plate-pill">${d.bikePlate}</span>
+            </div>
+
+            <div class="device-info-grid">
+                <div class="device-info-item">
+                    <span class="device-info-label">Assigned Rider</span>
+                    <span class="device-info-val">${d.riderName}</span>
+                </div>
+                <div class="device-info-item">
+                    <span class="device-info-label">Bike Model</span>
+                    <span class="device-info-val">${d.bikeModel}</span>
+                </div>
+                <div class="device-info-item">
+                    <span class="device-info-label">Patrol Sector</span>
+                    <span class="device-info-val">${d.location}</span>
+                </div>
+                <div class="device-info-item">
+                    <span class="device-info-label">Battery Level</span>
+                    <span class="device-info-val" style="color: #10B981;">${d.batteryPct}% (${d.batteryVoltage}V)</span>
+                </div>
+            </div>
+
+            <div class="device-sensor-tags">
+                <span class="sensor-tag"><i data-lucide="activity" style="width: 11px; height: 11px; color: #007AFF;"></i>${d.sensors?.accel || 'MPU6500 100Hz'}</span>
+                <span class="sensor-tag"><i data-lucide="navigation" style="width: 11px; height: 11px; color: #10B981;"></i>${d.sensors?.gps || 'NEO-6M GPS'}</span>
+                <span class="sensor-tag"><i data-lucide="radio" style="width: 11px; height: 11px; color: #8B5CF6;"></i>${d.sensors?.network || '4G LTE'}</span>
+                <span class="sensor-tag"><i data-lucide="hard-drive" style="width: 11px; height: 11px;"></i>${d.sensors?.sdStorage || '32GB Log'}</span>
+            </div>
+        `;
+
+        grid.appendChild(card);
+    });
+
+    if (window.lucide) lucide.createIcons();
+}
+
+async function adminClearPotholes() {
+    if (!confirm('Are you sure you want to clear all potholes from the database? This will restore all road corridors to 100% clean condition.')) {
+        return;
+    }
+
+    const res = await window.roadHealthAPI.clearPotholes();
+    if (res && res.success) {
+        await toggleHazardPins(true);
+        if (AppState.showHeatmap) await toggleHeatmapLayer();
+        if (AppState.originPoint && AppState.destPoint) {
+            await calculateAndRenderLiveRoutes(AppState.originPoint, AppState.destPoint);
+        }
+        speakHazardWarning('Pothole database cleared. Roads restored.');
+        alert('Potholes database cleared successfully.');
+    }
+}
+window.adminClearPotholes = adminClearPotholes;
+
+async function adminTriggerDecaySweep() {
+    const res = await window.roadHealthAPI._backendFetch('/potholes/decay/run', { method: 'POST' });
+    if (res && res.success) {
+        await toggleHazardPins(true);
+        if (AppState.originPoint && AppState.destPoint) {
+            await calculateAndRenderLiveRoutes(AppState.originPoint, AppState.destPoint);
+        }
+        alert(`Decay sweep completed:\n\nActive Updated: ${res.activeUpdated}\nAuto-Expired Aged Defects: ${res.autoExpired}`);
+    }
+}
+window.adminTriggerDecaySweep = adminTriggerDecaySweep;
+
 let wsConnection = null;
 
 function connectWebSocket() {
@@ -428,15 +564,12 @@ function connectWebSocket() {
         ? `wss://${window.location.host}`
         : (window.location.hostname === 'localhost' ? 'ws://localhost:8000' : `wss://${window.location.host}`);
 
-    console.log(`[WS] Connecting to ${wsUrl}...`);
-
     try {
         wsConnection = new WebSocket(wsUrl);
 
         wsConnection.onopen = () => {
-            console.log('[WS] WebSocket Live Stream Active');
             const statusEl = document.getElementById('telemetry-node-status');
-            if (statusEl) statusEl.textContent = 'PostGIS Live Stream Active';
+            if (statusEl) statusEl.textContent = 'ESP32 Live Stream Active';
         };
 
         wsConnection.onmessage = (event) => {
@@ -444,16 +577,13 @@ function connectWebSocket() {
                 const msg = JSON.parse(event.data);
                 handleWebSocketMessage(msg);
             } catch (err) {
-                console.warn('[WS] Invalid packet:', err);
             }
         };
 
         wsConnection.onclose = () => {
-            console.log('[WS] Disconnected. Reconnecting in 5s...');
             setTimeout(connectWebSocket, 5000);
         };
     } catch (err) {
-        console.warn('[WS] Failed to establish WebSocket:', err.message);
         setTimeout(connectWebSocket, 5000);
     }
 }
@@ -471,14 +601,16 @@ function handleWebSocketMessage(msg) {
 
         case 'pothole:detected':
             if (msg.data) {
-                console.log(`[WS] Live Pothole Alert: ${msg.data.severity} at ${msg.data.lat}, ${msg.data.lng}`);
                 toggleHazardPins(true);
-                speakHazardWarning(`Warning: Severe pothole detected with IRI ${msg.data.iri?.toFixed(1) || '6.0'}`);
+                speakHazardWarning(`Warning: Pothole detected ahead with IRI ${msg.data.iri?.toFixed(1) || '6.0'}`);
             }
             break;
 
-        case 'device:status':
-            renderESP32FleetGrid();
+        case 'pothole:repaired':
+            toggleHazardPins(true);
+            if (AppState.originPoint && AppState.destPoint) {
+                calculateAndRenderLiveRoutes(AppState.originPoint, AppState.destPoint);
+            }
             break;
     }
 }
@@ -488,14 +620,44 @@ function updateTelemetryDashboard(payload) {
     const iriEl = document.getElementById('metric-iri');
     const zaccEl = document.getElementById('metric-zacc');
     const vibEl = document.getElementById('metric-vib');
+    const subAccelEl = document.getElementById('submetric-accel-xy');
+    const subGyroEl = document.getElementById('submetric-gyro');
+    const bannerEl = document.getElementById('potholeAlertBanner');
+    const bannerText = document.getElementById('alertBannerText');
+    const bannerIcon = document.getElementById('alertBannerIcon');
 
     if (speedEl) speedEl.innerText = `${payload.speedKmh || 0} km/h`;
     if (iriEl) {
         iriEl.innerText = `${payload.iriEstimate ? payload.iriEstimate.toFixed(2) : '--'} m/km`;
-        iriEl.style.color = payload.iriEstimate > 4.5 ? '#EF4444' : (payload.iriEstimate > 2.5 ? '#F59E0B' : '#10B981');
+        iriEl.style.color = payload.iriEstimate >= 4.5 ? '#EF4444' : (payload.iriEstimate >= 2.5 ? '#F59E0B' : '#10B981');
     }
     if (zaccEl) zaccEl.innerText = `${payload.accel ? payload.accel.z.toFixed(2) : '--'} m/s²`;
     if (vibEl) vibEl.innerText = `${payload.vibrationMagnitude ? payload.vibrationMagnitude.toFixed(2) : '--'}`;
+
+    if (payload.accel && subAccelEl) {
+        subAccelEl.innerText = `${payload.accel.x?.toFixed(2) || '0.00'} / ${payload.accel.y?.toFixed(2) || '0.00'} m/s²`;
+    }
+
+    if (payload.gyro && subGyroEl) {
+        subGyroEl.innerText = `${payload.gyro.pitch?.toFixed(1) || '0.0'}° / ${payload.gyro.roll?.toFixed(1) || '0.0'}°`;
+    }
+
+    const isSpike = payload.potholeTrigger === true || (payload.accel && Math.abs(payload.accel.z - 9.81) / 9.81 >= 2.2);
+
+    if (bannerEl && bannerText && bannerIcon) {
+        if (isSpike) {
+            bannerEl.className = 'pothole-alert-banner alert-active';
+            bannerText.innerText = '🚨 POTHOLE IMPACT DETECTED (G-Spike > 2.2G)';
+            bannerIcon.setAttribute('data-lucide', 'alert-triangle');
+            bannerIcon.style.color = '#EF4444';
+        } else {
+            bannerEl.className = 'pothole-alert-banner';
+            bannerText.innerText = 'Road Surface Nominal (G-Force < 2.2G)';
+            bannerIcon.setAttribute('data-lucide', 'shield-check');
+            bannerIcon.style.color = '#10B981';
+        }
+        if (window.lucide) lucide.createIcons();
+    }
 
     if (payload.accel && payload.accel.z) {
         AppState.waveformHistory.push(payload.accel.z - 9.81);
@@ -509,8 +671,8 @@ let canvasCtx = null;
 function initWaveformCanvas() {
     const canvas = document.getElementById('waveformCanvas');
     if (!canvas) return;
-    canvas.width = (canvas.clientWidth || 280) * window.devicePixelRatio;
-    canvas.height = (canvas.clientHeight || 50) * window.devicePixelRatio;
+    canvas.width = (canvas.clientWidth || 300) * window.devicePixelRatio;
+    canvas.height = (canvas.clientHeight || 52) * window.devicePixelRatio;
     canvasCtx = canvas.getContext('2d');
 
     for (let i = 0; i < 50; i++) {
@@ -544,7 +706,7 @@ function startWaveformAnimation() {
 
             for (let i = 0; i < pts.length; i++) {
                 const val = pts[i];
-                const y = (h / 2) - (val * 8);
+                const y = (h / 2) - (val * 7);
                 const clampedY = Math.max(4, Math.min(h - 4, y));
 
                 if (i === 0) canvasCtx.moveTo(0, clampedY);
@@ -683,8 +845,6 @@ function toggleMapTheme(type) {
     AppState.activeBasemap = type;
     window.roadHealthMap.setBasemap(type);
     document.getElementById('settingsMenuContainer')?.classList.remove('open');
-
-    document.querySelectorAll('.dropdown-item .item-badge').forEach(b => b.remove());
 }
 
 function toggleRoutePanel() {
@@ -714,140 +874,28 @@ function toggleSensorDrawer() {
     }
 }
 
-async function renderESP32FleetGrid() {
-    const fleetGrid = document.getElementById('esp32FleetGrid');
-    if (!fleetGrid) return;
-
-    const fleet = await window.roadHealthAPI.getESP32Fleet();
-    fleetGrid.innerHTML = '';
-
-    const tabTitleEl = document.getElementById('fleetTabTitle');
-    const activeBadgeEl = document.getElementById('fleetActiveCountBadge');
-
-    const totalCount = fleet ? fleet.length : 0;
-    const activeCount = fleet ? fleet.filter(n => n.sensors && n.sensors.status === 'Active').length : 0;
-
-    if (tabTitleEl) tabTitleEl.innerText = `ESP32 Bike Fleet (${totalCount})`;
-    if (activeBadgeEl) {
-        activeBadgeEl.innerText = `● ${activeCount}/${totalCount} Nodes Connected to PostGIS`;
-    }
-
-    if (!fleet || fleet.length === 0) {
-        fleetGrid.innerHTML = `
-            <div style="grid-column: 1 / -1; padding: 24px; text-align: center; color: var(--text-secondary); background: #F8FAFC; border-radius: 12px;">
-                <i data-lucide="cpu" style="width: 32px; height: 32px; margin-bottom: 8px; color: var(--text-tertiary);"></i>
-                <div style="font-weight: 600;">No ESP32 Devices Registered in PostGIS</div>
-            </div>
-        `;
-        if (window.lucide) lucide.createIcons();
-        return;
-    }
-
-    fleet.forEach(node => {
-        const card = document.createElement('div');
-        card.className = 'esp32-node-card';
-        card.innerHTML = `
-            <div class="esp32-card-header">
-                <div class="bike-id-group">
-                    <div class="bike-plate-badge">🏍️ ${node.bikePlate}</div>
-                    <div class="node-model-sub">${node.bikeModel} • ${node.riderName}</div>
-                </div>
-                <div class="battery-status-wrap" style="color: var(--health-good);">
-                    <span>${node.batteryPct}%</span>
-                </div>
-            </div>
-            <div style="font-size: 0.76rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;">
-                <i data-lucide="map-pin" style="width: 13px; height: 13px; color: var(--apple-blue);"></i>
-                <span>${node.location}</span>
-            </div>
-            <div class="esp32-anomaly-alert">
-                <i data-lucide="alert-triangle" style="width: 13px; height: 13px; flex-shrink: 0;"></i>
-                <span>${node.lastAnomaly}</span>
-            </div>
-        `;
-        fleetGrid.appendChild(card);
-    });
-
-    if (window.lucide) lucide.createIcons();
-}
-
-function openAdminModal() {
-    document.getElementById('settingsMenuContainer')?.classList.remove('open');
-    renderESP32FleetGrid();
-    document.getElementById('adminModalOverlay')?.classList.add('active');
-}
-
-function closeAdminModal() {
-    document.getElementById('adminModalOverlay')?.classList.remove('active');
-}
-
-function closeAdminModalOnBackdrop(e) {
-    if (e.target.id === 'adminModalOverlay') closeAdminModal();
-}
-
-function switchAdminTab(tabKey) {
-    document.querySelectorAll('.admin-tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.admin-tab-pane').forEach(p => p.classList.remove('active'));
-
-    if (tabKey === 'fleet') {
-        document.getElementById('btnAdminTabFleet')?.classList.add('active');
-        document.getElementById('adminTabContentFleet')?.classList.add('active');
-    } else if (tabKey === 'settings') {
-        document.getElementById('btnAdminTabSettings')?.classList.add('active');
-        document.getElementById('adminTabContentSettings')?.classList.add('active');
-    } else if (tabKey === 'backend') {
-        document.getElementById('btnAdminTabBackend')?.classList.add('active');
-        document.getElementById('adminTabContentBackend')?.classList.add('active');
-    }
-}
-
-function updateAdminVal(spanId, value) {
-    const el = document.getElementById(spanId);
-    if (el) el.innerText = value;
-}
-
-async function saveAdminSettings() {
-    const iriThreshold = parseFloat(document.getElementById('sliderIri').value);
-    const vibThreshold = parseFloat(document.getElementById('sliderVib').value);
-
-    await window.roadHealthAPI._backendFetch('/routes/config', {
-        method: 'PUT',
-        body: JSON.stringify({
-            iriCriticalThreshold: iriThreshold,
-            zSpikeThreshold: vibThreshold
-        })
-    });
-
-    closeAdminModal();
-    if (AppState.selectedAnalyzedRoute) {
-        calculateAndRenderLiveRoutes(AppState.originPoint, AppState.destPoint);
-    }
-}
-
 async function syncPostGISHook() {
     const res = await window.roadHealthAPI.syncPostGIS();
     alert(`PostGIS Spatial Database Diagnostics:\n\nEngine: ${res.spatialIndexStatus}\nTotal Telemetry Records: ${res.recordsSynced}\nPotholes Cataloged: ${res.potholesCount}\nActive IoT Nodes: ${res.activeNodes}`);
+    document.getElementById('settingsMenuContainer')?.classList.remove('open');
 }
 
 async function connectLiveBackend() {
     try {
         const data = await window.roadHealthAPI._backendFetch('/health');
         if (data && data.status === 'ok') {
-            console.log('[RoadHealth] Connected to backend:', data.engine);
             const statusEl = document.getElementById('telemetry-node-status');
             const badgeEl = document.getElementById('backendBadge');
-            if (statusEl) statusEl.textContent = `${data.engine} Connected`;
+            if (statusEl) statusEl.textContent = 'ESP32 Live Stream Active';
             if (badgeEl) badgeEl.textContent = data.databaseType === 'postgis' ? 'PostGIS 3.3' : 'SQLite WAL';
         }
     } catch (err) {
-        console.warn('[RoadHealth] Backend connection error:', err.message);
     }
 }
 
 function setupEventListeners() {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-            closeAdminModal();
             closeExportModal();
             document.getElementById('settingsMenuContainer')?.classList.remove('open');
         }

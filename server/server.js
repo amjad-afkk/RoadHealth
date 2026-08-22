@@ -75,6 +75,7 @@ async function startServer() {
             console.log('  ║     POST  /api/v1/telemetry/simulate             ║');
             console.log('  ║     GET   /api/v1/potholes                       ║');
             console.log('  ║     GET   /api/v1/potholes/heatmap               ║');
+            console.log('  ║     POST  /api/v1/potholes/decay/run             ║');
             console.log('  ║     GET   /api/v1/potholes/export                ║');
             console.log('  ║     POST  /api/v1/routes/analyze                 ║');
             console.log('  ║     GET   /api/v1/health                         ║');
@@ -82,6 +83,14 @@ async function startServer() {
             console.log('  ╚══════════════════════════════════════════════════╝');
             console.log('');
         });
+
+        const { runDecaySweep } = require('./services/decayEngine');
+        setInterval(async () => {
+            try {
+                await runDecaySweep();
+            } catch (err) {
+            }
+        }, 30 * 60 * 1000);
     } catch (err) {
         console.error('[Server] Critical startup error:', err);
         process.exit(1);

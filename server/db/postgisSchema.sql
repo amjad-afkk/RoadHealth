@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS potholes (
     iri                 REAL DEFAULT 0,
     depth_cm            REAL DEFAULT 0,
     cluster_size        INTEGER DEFAULT 1,
+    confidence          REAL DEFAULT 1.0,
+    last_hit_at         TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    half_life_days      REAL DEFAULT 14.0,
     source_device       VARCHAR(100) REFERENCES devices(id),
     telemetry_id        INTEGER,
     status              VARCHAR(30) DEFAULT 'reported',
@@ -81,11 +84,3 @@ CREATE INDEX IF NOT EXISTS idx_potholes_severity   ON potholes(severity);
 CREATE INDEX IF NOT EXISTS idx_potholes_status     ON potholes(status);
 CREATE INDEX IF NOT EXISTS idx_segments_route      ON road_segments(route_id);
 
-INSERT INTO devices (id, bike_plate, bike_model, rider_name, location, battery_pct, battery_voltage, battery_status, firmware, status, accel_sensor, gps_sensor, network_info, sd_storage, last_anomaly)
-VALUES 
-    ('ESP32-NODE-TS09-EA-4412', 'TS 09 EA 4412', 'Royal Enfield Hunter 350', 'Patrol Unit 1 (R. Naresh)', 'Hitec City - Madhapur Sector', 94, 4.18, 'Good', 'v2.4.2-Release', 'Active', 'MPU6050 6-DoF (100 Hz)', 'NEO-6M GPS (3D Fix)', '4G LTE SIM7600', 'SanDisk 32GB', 'Nominal (No Hazards Detected)'),
-    ('ESP32-NODE-TS07-FA-8821', 'TS 07 FA 8821', 'Bajaj Pulsar N250', 'Patrol Unit 2 (K. Suresh)', 'Gachibowli Outer Ring Road', 88, 4.05, 'Good', 'v2.4.2-Release', 'Active', 'MPU6050 6-DoF (100 Hz)', 'NEO-6M GPS (3D Fix)', '4G LTE SIM7600', 'SanDisk 32GB', 'Severe Pothole Cluster (IRI 6.8 m/km)'),
-    ('ESP32-NODE-TS10-UB-9943', 'TS 10 UB 9943', 'TVS Apache RTR 200', 'Patrol Unit 3 (M. Vikram)', 'Kukatpally - Miyapur Corridor', 76, 3.92, 'Good', 'v2.4.2-Release', 'Active', 'MPU6050 6-DoF (100 Hz)', 'NEO-6M GPS (3D Fix)', '4G LTE SIM7600', 'SanDisk 32GB', 'Moderate Rutting (IRI 3.4 m/km)'),
-    ('ESP32-NODE-TS11-GH-3310', 'TS 11 GH 3310', 'Hero Xpulse 200 4V', 'Patrol Unit 4 (S. Arul)', 'Secunderabad - Begumpet', 91, 4.12, 'Good', 'v2.4.2-Release', 'Active', 'MPU6050 6-DoF (100 Hz)', 'NEO-6M GPS (3D Fix)', '4G LTE SIM7600', 'SanDisk 32GB', 'Nominal (Fresh Asphalt Layer)'),
-    ('ESP32-NODE-TS08-MN-7762', 'TS 08 MN 7762', 'Yamaha FZ-S V4', 'Patrol Unit 5 (D. Rahul)', 'Shamshabad Airport Expressway', 82, 3.98, 'Good', 'v2.4.2-Release', 'Active', 'MPU6050 6-DoF (100 Hz)', 'NEO-6M GPS (3D Fix)', '4G LTE SIM7600', 'SanDisk 32GB', 'Surface Crack Detected (Z-Spike 3.8G)')
-ON CONFLICT (id) DO NOTHING;

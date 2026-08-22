@@ -33,6 +33,11 @@ async function init(dbPath) {
                 if (fs.existsSync(schemaPath)) {
                     const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
                     await client.query(schemaSql);
+                    await client.query(`
+                        ALTER TABLE potholes ADD COLUMN IF NOT EXISTS confidence REAL DEFAULT 1.0;
+                        ALTER TABLE potholes ADD COLUMN IF NOT EXISTS last_hit_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+                        ALTER TABLE potholes ADD COLUMN IF NOT EXISTS half_life_days REAL DEFAULT 14.0;
+                    `);
                     console.log('[DB] ✅ PostGIS schema & spatial GiST indexes initialized successfully.');
                 }
 
@@ -68,6 +73,9 @@ function initSQLite(dbPath) {
     if (fs.existsSync(schemaPath)) {
         const schema = fs.readFileSync(schemaPath, 'utf-8');
         sqliteDb.exec(schema);
+        try { sqliteDb.exec("ALTER TABLE potholes ADD COLUMN confidence REAL DEFAULT 1.0;"); } catch (e) {}
+        try { sqliteDb.exec("ALTER TABLE potholes ADD COLUMN last_hit_at TEXT DEFAULT (datetime('now'));"); } catch (e) {}
+        try { sqliteDb.exec("ALTER TABLE potholes ADD COLUMN half_life_days REAL DEFAULT 14.0;"); } catch (e) {}
     }
 
     dbType = 'sqlite';

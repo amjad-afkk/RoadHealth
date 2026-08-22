@@ -100,7 +100,7 @@ class RoadHealthAPI {
                             osrmRoute, 
                             originName, 
                             destName, 
-                            rIdx === 0 ? 'good' : 'moderate', 
+                            'good', 
                             rIdx === 0 ? 'via Primary Highway' : `via Alternative Arterial ${rIdx}`
                         );
                         parsed.isPrimary = (rIdx === 0);
@@ -123,7 +123,7 @@ class RoadHealthAPI {
                     if (altRes.ok) {
                         const altData = await altRes.json();
                         if (altData.routes && altData.routes[0]) {
-                            const parsed = this._parseOSRMRouteToHealthSegments(altData.routes[0], originName, destName, 'moderate', 'via Ring Road Bypass');
+                            const parsed = this._parseOSRMRouteToHealthSegments(altData.routes[0], originName, destName, 'good', 'via Ring Road Bypass');
                             parsed.isPrimary = false;
                             routesList.push(parsed);
                         }
@@ -147,7 +147,7 @@ class RoadHealthAPI {
         const durationMin = Math.round(osrmRoute.duration / 60);
 
         const segments = [];
-        const stepSize = Math.max(12, Math.floor(fullCoords.length / 5));
+        const stepSize = Math.max(4, Math.floor(fullCoords.length / 16));
 
         for (let i = 0; i < fullCoords.length; i += stepSize) {
             const chunk = fullCoords.slice(i, i + stepSize + 1);
@@ -155,8 +155,8 @@ class RoadHealthAPI {
                 segments.push({
                     roadName: `${nameHint} • Section ${Math.floor(i / stepSize) + 1}`,
                     coords: chunk,
-                    health: baselineHealth,
-                    iri: baselineHealth === 'good' ? 1.1 : 2.8,
+                    health: 'good',
+                    iri: 1.1,
                     potholeCount: 0,
                     vibrationAvg: 0.3
                 });
@@ -170,7 +170,7 @@ class RoadHealthAPI {
             totalDistanceKm: distanceKm,
             baseDurationMin: durationMin,
             etaFormatted: `${durationMin} min`,
-            compositeScore: 92,
+            compositeScore: 95,
             ratios: { green: 100, yellow: 0, red: 0 },
             lengths: { goodKm: distanceKm, moderateKm: 0, badKm: 0 },
             totalPotholes: 0,
@@ -220,6 +220,10 @@ class RoadHealthAPI {
     async getESP32Fleet() {
         const res = await this._backendFetch('/devices');
         return res?.devices || [];
+    }
+
+    async clearPotholes() {
+        return await this._backendFetch('/potholes/clear', { method: 'POST' });
     }
 
     async syncPostGIS() {

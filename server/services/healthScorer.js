@@ -1,9 +1,14 @@
 const { isPostGIS, getPool, getDb } = require('../db/database');
 const { haversineDistance } = require('./detectionEngine');
+const { runDecaySweep } = require('./decayEngine');
 
-const CORRIDOR_BUFFER_M = 30;
+const CORRIDOR_BUFFER_M = 12;
 
 async function analyzeRouteHealth(segments) {
+    try {
+        await runDecaySweep();
+    } catch (e) {}
+
     const analyzedSegments = [];
 
     let totalLengthM = 0;
@@ -41,15 +46,19 @@ async function analyzeRouteHealth(segments) {
 
         if (isPostGIS()) {
             const pool = getPool();
+            const geojsonLine = JSON.stringify({
+                type: 'LineString',
+                coordinates: coords.map(c => [c[1], c[0]])
+            });
+
             const tRes = await pool.query(`
                 SELECT AVG(iri_estimate) as avg_iri, 
                        AVG(vibration_mag) as avg_vib,
                        COUNT(*) as reading_count,
                        SUM(pothole_trigger) as trigger_count
                 FROM telemetry
-                WHERE lat BETWEEN $1 AND $2
-                  AND lng BETWEEN $3 AND $4
-            `, [minLat - latBuffer, maxLat + latBuffer, minLng - lngBuffer, maxLng + lngBuffer]);
+                WHERE ST_DWithin(geom::geography, ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)::geography, $2)
+            `, [geojsonLine, CORRIDOR_BUFFER_M]);
             telemetryData = tRes.rows[0];
 
             const pRes = await pool.query(`
@@ -57,10 +66,11 @@ async function analyzeRouteHealth(segments) {
                        MAX(iri) as max_iri,
                        SUM(cluster_size) as total_detections
                 FROM potholes
-                WHERE lat BETWEEN $1 AND $2
-                  AND lng BETWEEN $3 AND $4
+                WHERE ST_DWithin(geom::geography, ST_SetSRID(ST_GeomFromGeoJSON($1), 4326)::geography, $2)
                   AND false_positive = 0
-            `, [minLat - latBuffer, maxLat + latBuffer, minLng - lngBuffer, maxLng + lngBuffer]);
+                  AND status != 'repaired'
+                  AND status != 'decayed_expired'
+            `, [geojsonLine, CORRIDOR_BUFFER_M]);
             potholeData = pRes.rows[0];
         } else {
             const db = getDb();
@@ -87,6 +97,8 @@ async function analyzeRouteHealth(segments) {
                 WHERE lat BETWEEN @minLat AND @maxLat
                   AND lng BETWEEN @minLng AND @maxLng
                   AND false_positive = 0
+                  AND status != 'repaired'
+                  AND status != 'decayed_expired'
             `).get({
                 minLat: minLat - latBuffer,
                 maxLat: maxLat + latBuffer,
@@ -103,20 +115,21 @@ async function analyzeRouteHealth(segments) {
         const potholeDensity = segLengthKm > 0 ? potholeCount / segLengthKm : 0;
 
         let health = 'good';
-        let finalIri = avgIri;
+        let finalIri = 1.1;
 
-        if (readingCount > 0) {
-            if (avgIri >= 4.5 || potholeDensity >= 1.5) {
+        if (potholeCount > 0) {
+            if (potholeCount >= 3 || potholeDensity >= 1.5) {
                 health = 'bad';
-            } else if (avgIri >= 2.5 || potholeDensity >= 0.5) {
+            } else {
                 health = 'moderate';
             }
-        } else if (potholeCount > 0) {
-            health = potholeCount >= 3 ? 'bad' : 'moderate';
             finalIri = parseFloat(potholeData.max_iri) || 3.0;
+        } else if (readingCount >= 5 && avgIri >= 4.5) {
+            health = 'moderate';
+            finalIri = avgIri;
         } else {
-            finalIri = 1.0;
             health = 'good';
+            finalIri = 1.1;
         }
 
         if (health === 'good') greenLengthM += segLengthM;

@@ -2,16 +2,22 @@ const express = require('express');
 const router = express.Router();
 const { isPostGIS, getPool, getDb } = require('../db/database');
 const { haversineDistance } = require('../services/detectionEngine');
+const { broadcast } = require('../ws/realtimeHub');
+const { calculateDecayedConfidence, runDecaySweep } = require('../services/decayEngine');
 
 router.get('/', async (req, res) => {
     try {
         let potholes = [];
-        const { severity, status, confirmed, limit = 500 } = req.query;
+        const { severity, status, confirmed, includeExpired, limit = 500 } = req.query;
 
         if (isPostGIS()) {
             const pool = getPool();
             let query = 'SELECT * FROM potholes WHERE false_positive = 0';
             const params = [];
+
+            if (!includeExpired) {
+                query += " AND status != 'decayed_expired'";
+            }
 
             if (severity) {
                 params.push(severity);
@@ -36,6 +42,10 @@ router.get('/', async (req, res) => {
             let query = 'SELECT * FROM potholes WHERE false_positive = 0';
             const params = {};
 
+            if (!includeExpired) {
+                query += " AND status != 'decayed_expired'";
+            }
+
             if (severity) {
                 query += ' AND severity = @severity';
                 params.severity = severity;
@@ -53,26 +63,61 @@ router.get('/', async (req, res) => {
             potholes = db.prepare(query).all(params);
         }
 
-        const formatted = potholes.map(p => ({
-            id: `p-${p.id}`,
-            numericId: p.id,
-            lat: parseFloat(p.lat),
-            lng: parseFloat(p.lng),
-            severity: p.severity,
-            iri: parseFloat(p.iri || 0),
-            depthCm: parseFloat(p.depth_cm || 0),
-            clusterSize: parseInt(p.cluster_size || 1),
-            sourceDevice: p.source_device,
-            status: p.status || 'reported',
-            assignedContractor: p.assigned_contractor || null,
-            confirmed: p.confirmed === 1,
-            detectedAt: p.detected_at,
-            updatedAt: p.updated_at
-        }));
+        const formatted = potholes.map(p => {
+            const decay = calculateDecayedConfidence(p);
+            return {
+                id: `p-${p.id}`,
+                numericId: p.id,
+                lat: parseFloat(p.lat),
+                lng: parseFloat(p.lng),
+                severity: p.severity,
+                iri: parseFloat(p.iri || 0),
+                depthCm: parseFloat(p.depth_cm || 0),
+                clusterSize: parseInt(p.cluster_size || 1),
+                confidence: decay.currentConfidence,
+                elapsedDays: decay.elapsedDays,
+                halfLifeDays: decay.halfLifeDays,
+                isExpired: decay.isExpired,
+                sourceDevice: p.source_device,
+                status: p.status || 'reported',
+                assignedContractor: p.assigned_contractor || null,
+                confirmed: p.confirmed === 1,
+                lastHitAt: p.last_hit_at || p.detected_at,
+                detectedAt: p.detected_at,
+                updatedAt: p.updated_at
+            };
+        });
 
         res.json({ success: true, potholes: formatted, count: formatted.length });
     } catch (err) {
         console.error('[Potholes] GET error:', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.post('/decay/run', async (req, res) => {
+    try {
+        const sweepResult = await runDecaySweep();
+        res.json(sweepResult);
+    } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+router.post('/clear', async (req, res) => {
+    try {
+        if (isPostGIS()) {
+            const pool = getPool();
+            await pool.query('TRUNCATE TABLE potholes RESTART IDENTITY CASCADE;');
+        } else {
+            const db = getDb();
+            db.prepare('DELETE FROM potholes;').run();
+        }
+
+        broadcast('pothole:repaired', { cleared: true });
+
+        res.json({ success: true, message: 'All potholes cleared from database.' });
+    } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
 });
@@ -84,18 +129,18 @@ router.get('/heatmap', async (req, res) => {
         if (isPostGIS()) {
             const pool = getPool();
             const result = await pool.query(`
-                SELECT lat, lng, severity, iri, cluster_size 
+                SELECT lat, lng, severity, iri, cluster_size, confidence, last_hit_at, half_life_days 
                 FROM potholes 
-                WHERE false_positive = 0 AND status != 'repaired'
+                WHERE false_positive = 0 AND status != 'repaired' AND status != 'decayed_expired'
                 ORDER BY detected_at DESC LIMIT 1000
             `);
             points = result.rows;
         } else {
             const db = getDb();
             points = db.prepare(`
-                SELECT lat, lng, severity, iri, cluster_size 
+                SELECT lat, lng, severity, iri, cluster_size, confidence, last_hit_at, half_life_days 
                 FROM potholes 
-                WHERE false_positive = 0 AND status != 'repaired'
+                WHERE false_positive = 0 AND status != 'repaired' AND status != 'decayed_expired'
                 ORDER BY detected_at DESC LIMIT 1000
             `).all();
         }
@@ -206,7 +251,10 @@ router.patch('/:id/status', async (req, res) => {
             });
         }
 
-        const numericId = parseInt(req.params.id.replace('p-', ''));
+        const numericId = parseInt(String(req.params.id).replace(/^p-/i, ''));
+        if (isNaN(numericId)) {
+            return res.status(400).json({ success: false, error: 'Invalid pothole ID' });
+        }
 
         if (isPostGIS()) {
             const pool = getPool();
@@ -227,6 +275,12 @@ router.patch('/:id/status', async (req, res) => {
                 WHERE id = @id
             `).run({ status, contractor: contractor || null, id: numericId });
         }
+
+        broadcast('pothole:repaired', {
+            id: `p-${numericId}`,
+            numericId,
+            status
+        });
 
         res.json({ success: true, message: `Pothole P-${numericId} status updated to '${status}'` });
     } catch (err) {
@@ -327,7 +381,7 @@ router.post('/', async (req, res) => {
         const sev = severity || 'moderate';
         const iriVal = parseFloat(iri) || 3.0;
         const depth = parseFloat(depthCm) || 5.0;
-        const dev = sourceDevice || 'manual-report';
+        const dev = sourceDevice || 'ESP32-NODE-TS09-EA-4412';
 
         let newId = null;
 
@@ -367,7 +421,10 @@ router.post('/', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
     try {
-        const numericId = parseInt(req.params.id.replace('p-', ''));
+        const numericId = parseInt(String(req.params.id).replace(/^p-/i, ''));
+        if (isNaN(numericId)) {
+            return res.status(400).json({ success: false, error: 'Invalid pothole ID' });
+        }
 
         if (isPostGIS()) {
             const pool = getPool();
@@ -387,6 +444,12 @@ router.delete('/:id', async (req, res) => {
                 return res.status(404).json({ success: false, error: 'Pothole not found' });
             }
         }
+
+        broadcast('pothole:repaired', {
+            id: `p-${numericId}`,
+            numericId,
+            status: 'deleted'
+        });
 
         res.json({ success: true, message: 'Pothole marked as false positive' });
     } catch (err) {
