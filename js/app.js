@@ -1,10 +1,4 @@
-/**
- * RoadHealth — Main Application Controller (Fully Live Engine)
- * Strictly connects to Node.js Spatial Server & ESP32 IoT Nodes over WebSockets.
- * ZERO simulated vehicle drive loops, ZERO mock generators.
- */
 
-// Application State
 const AppState = {
     alternativeRoutes: [],
     selectedRouteIndex: 0,
@@ -17,7 +11,6 @@ const AppState = {
     activeNodeId: null
 };
 
-// Telangana Quick Location Presets
 const TELANGANA_PRESETS = {
     hyd_airport: {
         origin: { name: 'Hitec City, Hyderabad', lat: 17.4435, lng: 78.3772 },
@@ -37,9 +30,6 @@ const TELANGANA_PRESETS = {
     }
 };
 
-// ==========================================================================
-// Lifecycle & Initialization
-// ==========================================================================
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('[RoadHealth App] Initializing Fully Live IoT Road Intelligence Engine...');
 
@@ -47,33 +37,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         lucide.createIcons();
     }
 
-    // 1. Initialize Map with High-Res Satellite
     window.roadHealthMap = new RoadHealthMap('map');
 
-    // 2. Setup Canvas for Waveform
     initWaveformCanvas();
 
-    // 3. Bind Geocoding Autocomplete
     setupAutocompleteListeners();
 
-    // 4. Connect to Real REST Backend & Render Fleet
     await connectLiveBackend();
     await renderESP32FleetGrid();
 
-    // 5. Initial Route Calculation via OSRM & Spatial Corridor Queries
     await loadPresetRoute('hyd_airport');
 
-    // 6. Global Event Listeners & Waveform Canvas Loop
     setupEventListeners();
     startWaveformAnimation();
 
-    // 7. Connect Live WebSocket Stream
     connectWebSocket();
 });
 
-/**
- * Load and calculate a preset route via live geocoding & OSRM
- */
+
 async function loadPresetRoute(presetKey) {
     const preset = TELANGANA_PRESETS[presetKey];
     if (!preset) return;
@@ -93,9 +74,7 @@ async function loadPresetRoute(presetKey) {
     await calculateAndRenderLiveRoutes(preset.origin, preset.dest);
 }
 
-/**
- * Handle custom route search using Nominatim & OSRM
- */
+
 async function handleCustomRouteSearch() {
     const inOrigin = document.getElementById('inputOrigin').value.trim();
     const inDest = document.getElementById('inputDest').value.trim();
@@ -136,11 +115,8 @@ async function handleCustomRouteSearch() {
     }
 }
 
-/**
- * Fetch OSRM geometry and analyze corridor against database telemetry
- */
+
 async function calculateAndRenderLiveRoutes(origin, dest) {
-    // 1. Fetch real road routes from OSRM engine
     const rawRoutesList = await window.roadHealthAPI.calculateMultipleRoutesBetween(origin, dest, origin.name, dest.name);
 
     if (!rawRoutesList || rawRoutesList.length === 0) {
@@ -148,7 +124,6 @@ async function calculateAndRenderLiveRoutes(origin, dest) {
         return;
     }
 
-    // 2. Query spatial server database for corridor telemetry
     const analyzedList = [];
     for (const r of rawRoutesList) {
         const backendRes = await window.roadHealthAPI._backendFetch('/routes/analyze', {
@@ -169,7 +144,6 @@ async function calculateAndRenderLiveRoutes(origin, dest) {
                 segments: backendRes.analysis.segments
             });
         } else {
-            // Local fallback analytics if server offline
             analyzedList.push(window.roadHealthEngine.analyzeRoute(r));
         }
     }
@@ -178,22 +152,16 @@ async function calculateAndRenderLiveRoutes(origin, dest) {
     AppState.selectedRouteIndex = 0;
     AppState.selectedAnalyzedRoute = AppState.alternativeRoutes[0];
 
-    // 3. Render real routes on Leaflet map
     window.roadHealthMap.renderMultipleRoutes(AppState.alternativeRoutes, 0);
 
-    // 4. Render route cards in side drawer
     renderAlternativeRouteCards(AppState.alternativeRoutes, 0);
 
-    // 5. Update bottom summary card
     updateFloatingSummaryCard(AppState.selectedAnalyzedRoute);
 
-    // 6. Refresh active pothole markers
     await toggleHazardPins(true);
 }
 
-/**
- * Select active alternative route
- */
+
 function selectAlternativeRoute(index) {
     if (index < 0 || index >= AppState.alternativeRoutes.length) return;
 
@@ -206,9 +174,7 @@ function selectAlternativeRoute(index) {
 }
 window.selectAlternativeRoute = selectAlternativeRoute;
 
-/**
- * Render alternative route cards list
- */
+
 function renderAlternativeRouteCards(routes, selectedIndex = 0) {
     const listEl = document.getElementById('routeCardList');
     const headerEl = document.getElementById('altRouteHeader');
@@ -260,9 +226,7 @@ function renderAlternativeRouteCards(routes, selectedIndex = 0) {
     if (window.lucide) lucide.createIcons();
 }
 
-/**
- * Update summary card metrics
- */
+
 function updateFloatingSummaryCard(analyzed) {
     if (!analyzed) return;
 
@@ -306,9 +270,6 @@ function updateFloatingSummaryCard(analyzed) {
     if (legRed) legRed.innerText = `Critical / Potholes: ${analyzed.ratios.red}%`;
 }
 
-// ==========================================================================
-// Admin Dashboard: Registered ESP32 IoT Node Fleet Monitor
-// ==========================================================================
 async function renderESP32FleetGrid() {
     const fleetGrid = document.getElementById('esp32FleetGrid');
     if (!fleetGrid) return;
@@ -413,9 +374,6 @@ function switchAdminTab(tabKey) {
     }
 }
 
-// ==========================================================================
-// Basemap Switcher
-// ==========================================================================
 function setMapBasemap(type) {
     AppState.activeBasemap = type;
     window.roadHealthMap.setBasemap(type);
@@ -432,9 +390,6 @@ function toggleMapTheme(type) {
     if (container) container.classList.remove('open');
 }
 
-// ==========================================================================
-// Autocomplete & Search Handlers
-// ==========================================================================
 let originDebounceTimer = null;
 let destDebounceTimer = null;
 
@@ -556,9 +511,6 @@ function inspectDistressOverlays() {
     window.roadHealthMap.focusOnDistressZone();
 }
 
-// ==========================================================================
-// Settings & Admin Access Placement
-// ==========================================================================
 function toggleSettingsDropdown(e) {
     if (e) e.stopPropagation();
     const container = document.getElementById('settingsMenuContainer');
@@ -653,9 +605,6 @@ function toggleSensorDrawer() {
     }
 }
 
-// ==========================================================================
-// Live Backend Connection & WebSocket Telemetry Stream
-// ==========================================================================
 async function connectLiveBackend() {
     window.roadHealthAPI.configure({ mode: 'nodejs' });
 
@@ -769,7 +718,6 @@ function updateTelemetryDashboard(payload, segmentHealth) {
     }
 }
 
-// Waveform Visualizer
 let canvasCtx = null;
 function initWaveformCanvas() {
     const canvas = document.getElementById('waveformCanvas');

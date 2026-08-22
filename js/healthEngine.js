@@ -6,33 +6,28 @@
 
 class RoadHealthEngine {
     constructor() {
-        // Calibration weights (can be tuned via Admin Dashboard)
         this.weights = {
-            iri: 0.45,           // Weight of International Roughness Index
-            potholeDensity: 0.35,// Weight of pothole frequency per km
-            vibration: 0.20      // Weight of IoT accelerometer variance
+            iri: 0.45,           
+            potholeDensity: 0.35,
+            vibration: 0.20      
         };
 
-        // Speed reduction factors based on road degradation
+        
         this.speedModifiers = {
-            good: 1.0,           // 100% nominal speed
-            moderate: 0.85,      // 15% speed reduction
-            bad: 0.60            // 40% speed reduction due to severe distress/potholes
+            good: 1.0,           
+            moderate: 0.85,      
+            bad: 0.60            
         };
     }
 
-    /**
-     * Update engine calibration weights (from Admin Settings)
-     */
+    
     updateWeights(newWeights) {
         this.weights = { ...this.weights, ...newWeights };
     }
 
-    /**
-     * Compute distance between two lat/lng coordinates in meters (Haversine formula)
-     */
+    
     haversineDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371e3; // Earth radius in meters
+        const R = 6371e3; 
         const φ1 = lat1 * Math.PI / 180;
         const φ2 = lat2 * Math.PI / 180;
         const Δφ = (lat2 - lat1) * Math.PI / 180;
@@ -46,9 +41,7 @@ class RoadHealthEngine {
         return R * c;
     }
 
-    /**
-     * Calculate total length of a polyline coordinate array in meters
-     */
+   
     calculatePolylineLengthMeters(coords) {
         let total = 0;
         for (let i = 0; i < coords.length - 1; i++) {
@@ -60,9 +53,7 @@ class RoadHealthEngine {
         return total;
     }
 
-    /**
-     * Calculate comprehensive analytics for a given route
-     */
+    
     analyzeRoute(route) {
         if (!route || !route.segments || route.segments.length === 0) {
             return null;
@@ -96,8 +87,7 @@ class RoadHealthEngine {
             weightedIriSum += segIri * segLengthM;
             weightedVibrationSum += segVib * segLengthM;
 
-            // Compute speed-adjusted travel time for this segment
-            const nominalSpeedKmh = 60; // baseline nominal 60 km/h
+            const nominalSpeedKmh = 60; 
             const speedMod = this.speedModifiers[health] || 1.0;
             const actualSpeedMs = (nominalSpeedKmh * speedMod) / 3.6;
             const segDurationSec = actualSpeedMs > 0 ? (segLengthM / actualSpeedMs) : 60;
@@ -115,13 +105,11 @@ class RoadHealthEngine {
             };
         });
 
-        // Calculate exact length-weighted ratios
         const validTotal = totalLengthM > 0 ? totalLengthM : 1;
         let greenRatio = Math.round((greenLengthM / validTotal) * 100);
         let yellowRatio = Math.round((yellowLengthM / validTotal) * 100);
         let redRatio = Math.round((redLengthM / validTotal) * 100);
 
-        // Normalize sum to 100%
         const sum = greenRatio + yellowRatio + redRatio;
         if (sum !== 100 && sum > 0) {
             const diff = 100 - sum;
@@ -133,8 +121,6 @@ class RoadHealthEngine {
         const avgIri = +(weightedIriSum / validTotal).toFixed(2);
         const avgVibration = +(weightedVibrationSum / validTotal).toFixed(2);
 
-        // Calculate Composite Road Health Score (0 - 100, where 100 is pristine)
-        // High IRI and high potholes penalize the score
         const iriPenalty = Math.min(45, (avgIri / 7.0) * 45);
         const potholeDensityPerKm = (totalPotholes / (validTotal / 1000));
         const potholePenalty = Math.min(35, (potholeDensityPerKm / 2.0) * 35);
@@ -142,7 +128,6 @@ class RoadHealthEngine {
 
         const compositeScore = Math.max(10, Math.min(99, Math.round(100 - (iriPenalty + potholePenalty + vibrationPenalty))));
 
-        // Format ETA
         const totalDurationMin = Math.max(1, Math.round(adjustedDurationSeconds / 60));
         const etaHours = Math.floor(totalDurationMin / 60);
         const etaMinutes = totalDurationMin % 60;
@@ -175,9 +160,6 @@ class RoadHealthEngine {
         };
     }
 
-    /**
-     * Get hex color code for health status
-     */
     getHealthColor(health) {
         switch (health) {
             case 'good':
@@ -191,9 +173,7 @@ class RoadHealthEngine {
         }
     }
 
-    /**
-     * Health label and badge representation
-     */
+
     getHealthBadge(health) {
         switch (health) {
             case 'good':
@@ -208,5 +188,4 @@ class RoadHealthEngine {
     }
 }
 
-// Global singleton instance
 window.roadHealthEngine = new RoadHealthEngine();
