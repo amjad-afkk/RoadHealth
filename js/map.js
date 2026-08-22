@@ -90,6 +90,12 @@ class RoadHealthMap {
         });
 
         this.map.on('click', (e) => {
+            if (e.originalEvent) {
+                const target = e.originalEvent.target;
+                if (target && (target.closest('.leaflet-popup') || target.closest('.custom-pothole-hazard-pin') || target.closest('.leaflet-marker-icon') || target.closest('.popup-action-btn'))) {
+                    return;
+                }
+            }
             const lat = e.latlng.lat;
             const lng = e.latlng.lng;
             const popupContent = `
@@ -102,7 +108,7 @@ class RoadHealthMap {
                     </div>
                 </div>
             `;
-            L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(this.map);
+            L.popup({ className: 'map-point-picker-popup' }).setLatLng(e.latlng).setContent(popupContent).openOn(this.map);
         });
 
         console.log('[RoadHealth Map] Initialized with Multi-Basemaps & PostGIS.');
@@ -357,7 +363,18 @@ class RoadHealthMap {
                 </div>
             `;
 
-            const marker = L.marker([p.lat, p.lng], { icon: icon }).bindPopup(popupContent);
+            const marker = L.marker([p.lat, p.lng], { icon: icon });
+            marker.bindPopup(popupContent, {
+                autoClose: true,
+                closeOnClick: false,
+                className: 'pothole-interactive-popup',
+                offset: [0, -10]
+            });
+            marker.on('click', (e) => {
+                if (e && e.originalEvent) {
+                    e.originalEvent.stopPropagation();
+                }
+            });
             this.layers.potholeMarkerGroup.addLayer(marker);
         });
     }

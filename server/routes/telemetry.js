@@ -24,17 +24,25 @@ router.post('/', async (req, res) => {
         const gyroPitch = parseFloat(body.gyro?.pitch ?? 0);
         const gyroRoll = parseFloat(body.gyro?.roll ?? 0);
 
-        const vibrationMag = body.vibrationMagnitude !== undefined
-            ? parseFloat(body.vibrationMagnitude)
-            : Math.sqrt(accelX * accelX + accelY * accelY + (accelZ - 9.81) * (accelZ - 9.81));
+        const totalMag = Math.sqrt(accelX * accelX + accelY * accelY + accelZ * accelZ);
+        const dynamicDeviation = Math.abs(totalMag - 9.81);
 
-        const iriEstimate = body.iriEstimate !== undefined
+        let vibrationMag = body.vibrationMagnitude !== undefined
+            ? parseFloat(body.vibrationMagnitude)
+            : dynamicDeviation;
+
+        let iriEstimate = body.iriEstimate !== undefined
             ? parseFloat(body.iriEstimate)
             : +(vibrationMag * 2.8).toFixed(2);
 
-        const potholeTrigger = body.potholeTrigger
+        if (speedKmh < 3.0) {
+            vibrationMag = Math.min(vibrationMag, 0.25);
+            iriEstimate = Math.min(iriEstimate, 1.2);
+        }
+
+        const potholeTrigger = (body.potholeTrigger && speedKmh >= 3.0)
             ? 1
-            : (Math.abs(accelZ - 9.81) > 3.2 ? 1 : 0);
+            : (dynamicDeviation > 21.5 && speedKmh >= 3.0 ? 1 : 0);
 
         let insertedId = null;
 

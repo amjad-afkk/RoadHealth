@@ -11,13 +11,22 @@ const CONFIG = {
 };
 
 async function analyzeTelemetry(telemetryRow) {
-    const { id, device_id, lat, lng, accel_z, iri_estimate, vibration_mag } = telemetryRow;
+    const { id, device_id, lat, lng, speed_kmh, accel_x, accel_y, accel_z, iri_estimate, vibration_mag } = telemetryRow;
 
-    const zDeviation = Math.abs((accel_z || CONFIG.GRAVITY) - CONFIG.GRAVITY);
-    const gForce = zDeviation / CONFIG.GRAVITY;
+    const speed = parseFloat(speed_kmh || 0);
+    if (speed < 3.0) {
+        return null;
+    }
+
+    const ax = parseFloat(accel_x || 0);
+    const ay = parseFloat(accel_y || 0);
+    const az = parseFloat(accel_z || CONFIG.GRAVITY);
+    const totalMag = Math.sqrt(ax * ax + ay * ay + az * az);
+    const dynamicDeviation = Math.abs(totalMag - CONFIG.GRAVITY);
+    const gForce = dynamicDeviation / CONFIG.GRAVITY;
 
     const isSpikeDetected = gForce >= CONFIG.Z_SPIKE_THRESHOLD_G;
-    const iriValue = iri_estimate || estimateIRI(vibration_mag);
+    const iriValue = parseFloat(iri_estimate || estimateIRI(vibration_mag));
     const isHighIRI = iriValue >= CONFIG.IRI_MODERATE_THRESHOLD;
 
     if (!isSpikeDetected && !isHighIRI) {

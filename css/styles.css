@@ -1269,8 +1269,52 @@ html, body {
     100% { transform: scale(2.0); opacity: 0; }
 }
 
+.pothole-interactive-popup .leaflet-popup-content-wrapper {
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(16px);
+    border-radius: 12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 2px;
+}
+
 .pothole-popup-card {
-    min-width: 200px;
+    min-width: 230px;
+    padding: 6px 4px;
+    pointer-events: auto;
+}
+
+.popup-action-btn {
+    font-size: 0.76rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    pointer-events: auto;
+}
+
+.popup-action-btn.btn-repair {
+    background: #10B981;
+    color: #FFFFFF;
+}
+
+.popup-action-btn.btn-repair:hover {
+    background: #059669;
+}
+
+.popup-action-btn.btn-delete {
+    background: #FEE2E2;
+    color: #DC2626;
+}
+
+.popup-action-btn.btn-delete:hover {
+    background: #FECACA;
 }
 
 @media (max-width: 900px) {

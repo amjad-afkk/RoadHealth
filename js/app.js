@@ -663,23 +663,34 @@ function updateTelemetryDashboard(payload) {
     const bannerText = document.getElementById('alertBannerText');
     const bannerIcon = document.getElementById('alertBannerIcon');
 
-    if (speedEl) speedEl.innerText = `${payload.speedKmh || 0} km/h`;
+    const ax = payload.accel?.x ?? 0;
+    const ay = payload.accel?.y ?? 0;
+    const az = payload.accel?.z ?? 9.81;
+    const totalMag = Math.sqrt(ax * ax + ay * ay + az * az);
+    const dynamicG = Math.abs(totalMag - 9.81) / 9.81;
+    const speed = payload.speedKmh ?? (payload.speed ?? 0);
+    const isStationary = speed < 3.0;
+
+    const displayIri = isStationary ? Math.min(payload.iriEstimate || 1.1, 1.2) : (payload.iriEstimate || 1.1);
+    const displayVib = isStationary ? Math.min(payload.vibrationMagnitude || 0.2, 0.25) : (payload.vibrationMagnitude || 0.2);
+
+    if (speedEl) speedEl.innerText = `${speed.toFixed(1)} km/h`;
     if (iriEl) {
-        iriEl.innerText = `${payload.iriEstimate ? payload.iriEstimate.toFixed(2) : '--'} m/km`;
-        iriEl.style.color = payload.iriEstimate >= 4.5 ? '#EF4444' : (payload.iriEstimate >= 2.5 ? '#F59E0B' : '#10B981');
+        iriEl.innerText = `${displayIri.toFixed(2)} m/km`;
+        iriEl.style.color = displayIri >= 4.5 ? '#EF4444' : (displayIri >= 2.5 ? '#F59E0B' : '#10B981');
     }
-    if (zaccEl) zaccEl.innerText = `${payload.accel ? payload.accel.z.toFixed(2) : '--'} m/s²`;
-    if (vibEl) vibEl.innerText = `${payload.vibrationMagnitude ? payload.vibrationMagnitude.toFixed(2) : '--'}`;
+    if (zaccEl) zaccEl.innerText = `${az.toFixed(2)} m/s²`;
+    if (vibEl) vibEl.innerText = `${displayVib.toFixed(2)}`;
 
     if (payload.accel && subAccelEl) {
-        subAccelEl.innerText = `${payload.accel.x?.toFixed(2) || '0.00'} / ${payload.accel.y?.toFixed(2) || '0.00'} m/s²`;
+        subAccelEl.innerText = `${ax.toFixed(2)} / ${ay.toFixed(2)} m/s²`;
     }
 
     if (payload.gyro && subGyroEl) {
         subGyroEl.innerText = `${payload.gyro.pitch?.toFixed(1) || '0.0'}° / ${payload.gyro.roll?.toFixed(1) || '0.0'}°`;
     }
 
-    const isSpike = payload.potholeTrigger === true || (payload.accel && Math.abs(payload.accel.z - 9.81) / 9.81 >= 2.2);
+    const isSpike = !isStationary && (payload.potholeTrigger === true || dynamicG >= 2.2);
 
     if (bannerEl && bannerText && bannerIcon) {
         if (isSpike) {
@@ -689,18 +700,17 @@ function updateTelemetryDashboard(payload) {
             bannerIcon.style.color = '#EF4444';
         } else {
             bannerEl.className = 'pothole-alert-banner';
-            bannerText.innerText = 'Road Surface Nominal (G-Force < 2.2G)';
-            bannerIcon.setAttribute('data-lucide', 'shield-check');
+            bannerText.innerText = isStationary ? 'Stationary Node / Zero Road Motion' : 'Road Surface Nominal (G-Force < 2.2G)';
+            bannerIcon.setAttribute('data-lucide', isStationary ? 'pause-circle' : 'shield-check');
             bannerIcon.style.color = '#10B981';
         }
         if (window.lucide) lucide.createIcons();
     }
 
-    if (payload.accel && payload.accel.z) {
-        AppState.waveformHistory.push(payload.accel.z - 9.81);
-        if (AppState.waveformHistory.length > 50) {
-            AppState.waveformHistory.shift();
-        }
+    const waveformVal = isStationary ? (totalMag - 9.81) : (az - 9.81);
+    AppState.waveformHistory.push(waveformVal);
+    if (AppState.waveformHistory.length > 50) {
+        AppState.waveformHistory.shift();
     }
 }
 
