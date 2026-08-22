@@ -364,6 +364,7 @@ class RoadHealthMap {
             `;
 
             const marker = L.marker([p.lat, p.lng], { icon: icon });
+            marker._potholeId = p.id;
             marker.bindPopup(popupContent, {
                 autoClose: true,
                 closeOnClick: false,
@@ -377,6 +378,16 @@ class RoadHealthMap {
             });
             this.layers.potholeMarkerGroup.addLayer(marker);
         });
+    }
+
+    removePotholeMarker(id) {
+        const normId = String(id).toLowerCase();
+        this.layers.potholeMarkerGroup.eachLayer(layer => {
+            if (layer._potholeId && String(layer._potholeId).toLowerCase() === normId) {
+                this.layers.potholeMarkerGroup.removeLayer(layer);
+            }
+        });
+        if (this.map) this.map.closePopup();
     }
 
     updateVehiclePosition(lat, lng) {

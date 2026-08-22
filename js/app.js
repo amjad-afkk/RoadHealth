@@ -398,48 +398,21 @@ function drawRouteProfileChart(route) {
 }
 
 async function markPotholeRepaired(id) {
-    const res = await window.roadHealthAPI.updatePotholeStatus(id, 'repaired', 'GHMC Road Maintenance Unit');
-    if (res && res.success) {
-        await toggleHazardPins(true);
-        if (AppState.showHeatmap) await toggleHeatmapLayer();
-        speakHazardWarning('Pothole repaired. Road surface restored.');
-        if (AppState.originPoint && AppState.destPoint) {
-            await calculateAndRenderLiveRoutes(AppState.originPoint, AppState.destPoint);
-        }
+    if (window.roadHealthMap) {
+        window.roadHealthMap.removePotholeMarker(id);
     }
+    speakHazardWarning('Pothole marked repaired.');
+    window.roadHealthAPI.updatePotholeStatus(id, 'repaired', 'GHMC Road Maintenance Unit').catch(() => {});
 }
 window.markPotholeRepaired = markPotholeRepaired;
 
 async function flagPotholeFalsePositive(id) {
-    const res = await window.roadHealthAPI.flagFalsePositive(id);
-    if (res && res.success) {
-        await toggleHazardPins(true);
-        if (AppState.showHeatmap) await toggleHeatmapLayer();
-        if (AppState.originPoint && AppState.destPoint) {
-            await calculateAndRenderLiveRoutes(AppState.originPoint, AppState.destPoint);
-        }
+    if (window.roadHealthMap) {
+        window.roadHealthMap.removePotholeMarker(id);
     }
+    window.roadHealthAPI.flagFalsePositive(id).catch(() => {});
 }
 window.flagPotholeFalsePositive = flagPotholeFalsePositive;
-
-async function startVirtualBikeSimulation() {
-    const route = AppState.selectedAnalyzedRoute;
-    let coords = null;
-
-    if (route && route.segments) {
-        coords = [];
-        route.segments.forEach(s => {
-            if (s.coords) coords.push(...s.coords);
-        });
-    }
-
-    const res = await window.roadHealthAPI.simulatePatrolBike(coords);
-    if (res && res.success) {
-        speakHazardWarning('Simulating ESP32 patrol bike ride.');
-        const container = document.getElementById('settingsMenuContainer');
-        if (container) container.classList.remove('open');
-    }
-}
 
 function openExportModal() {
     const container = document.getElementById('settingsMenuContainer');
@@ -655,9 +628,8 @@ function handleWebSocketMessage(msg) {
             break;
 
         case 'pothole:repaired':
-            toggleHazardPins(true);
-            if (AppState.originPoint && AppState.destPoint) {
-                calculateAndRenderLiveRoutes(AppState.originPoint, AppState.destPoint);
+            if (msg.data && msg.data.id && window.roadHealthMap) {
+                window.roadHealthMap.removePotholeMarker(msg.data.id);
             }
             break;
     }
