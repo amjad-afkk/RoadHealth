@@ -4,10 +4,10 @@
 #include <WiFiClientSecure.h>
 #include <TinyGPS++.h>
 
-const char* WIFI_SSID     = "vivo v29";
-const char* WIFI_PASSWORD = "2909072006";
-const char* SERVER_URL    = "https://roadhealth.onrender.com/api/v1/telemetry";
-const char* DEVICE_ID     = "ESP32-NODE-TS09-EA-4412";
+const char* WIFI_SSID     = "WIFI_NAME";
+const char* WIFI_PASSWORD = "WIFI_PASSWORD";
+const char* SERVER_URL    = "SERVER_URL_HERE";
+const char* DEVICE_ID     = "DEVICE_ID_HERE";
 
 #define MPU6500_ADDR     0x68
 #define GPS_BAUD         9600
