@@ -1,11 +1,4 @@
-/**
- * RoadHealth — Pure REST API Client (Strict Live Mode)
- * Features:
- * - 100% Real-World Road Network Navigation (OSRM Driving Engine & OpenStreetMap Nominatim)
- * - Real Telangana Road Geometries from OSRM driving graph
- * - Real ESP32 Bike IoT Sensor Fleet Telemetry over REST API & WebSockets
- * - Zero mock data generators, zero hardcoded fallback data
- */
+
 
 class RoadHealthAPI {
     constructor() {
@@ -21,9 +14,7 @@ class RoadHealthAPI {
         console.log(`[RoadHealth API] Mode: ${this.config.mode.toUpperCase()} (Base: ${this.config.baseUrl})`);
     }
 
-    /**
-     * Helper: fetch request to the live backend server
-     */
+    
     async _backendFetch(path, options = {}) {
         try {
             const url = `${this.config.baseUrl}${path}`;
@@ -43,9 +34,7 @@ class RoadHealthAPI {
         }
     }
 
-    /**
-     * Real-world geocoding prioritizing Telangana and India via Nominatim OSM
-     */
+    
     async geocodeAddress(query) {
         if (!query || query.trim().length < 2) return [];
 
@@ -65,7 +54,6 @@ class RoadHealthAPI {
                 }));
             }
 
-            // Fallback to broader Nominatim search
             const broadUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`;
             const broadRes = await fetch(broadUrl);
             const broadData = await broadRes.json();
@@ -82,15 +70,11 @@ class RoadHealthAPI {
         }
     }
 
-    /**
-     * Calculate MULTIPLE genuine real-world alternative routes between From and To
-     * Every route is composed of real physical roads from the OSRM road graph.
-     */
+    
     async calculateMultipleRoutesBetween(origin, dest, originName = 'Origin', destName = 'Destination') {
         const routesList = [];
 
         try {
-            // 1. Fetch Primary Route from OSRM with alternatives=true
             const directUrl = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${dest.lng},${dest.lat}?overview=full&geometries=geojson&alternatives=true&steps=true`;
             const directRes = await fetch(directUrl);
             if (directRes.ok) {
@@ -104,18 +88,15 @@ class RoadHealthAPI {
                 }
             }
 
-            // 2. If OSRM returned fewer than 3 alternatives, query real road waypoints
             if (routesList.length < 3) {
                 const midLat = (origin.lat + dest.lat) / 2;
                 const midLng = (origin.lng + dest.lng) / 2;
                 const dLat = dest.lat - origin.lat;
                 const dLng = dest.lng - origin.lng;
 
-                // Lateral offset vectors
                 const offset1 = { lat: midLat + (-dLng * 0.28), lng: midLng + (dLat * 0.28) };
                 const offset2 = { lat: midLat + (dLng * 0.25), lng: midLng + (-dLat * 0.25) };
 
-                // Snap waypoints to nearest real roads via OSRM /nearest/
                 const [snap1, snap2] = await Promise.all([
                     this._snapToNearestRoad(offset1.lat, offset1.lng),
                     this._snapToNearestRoad(offset2.lat, offset2.lng)
@@ -154,9 +135,7 @@ class RoadHealthAPI {
         return routesList;
     }
 
-    /**
-     * Snap coordinate to the nearest real drivable road using OSRM nearest service
-     */
+    
     async _snapToNearestRoad(lat, lng) {
         try {
             const url = `https://router.project-osrm.org/nearest/v1/driving/${lng},${lat}?number=1`;
@@ -176,15 +155,12 @@ class RoadHealthAPI {
         return null;
     }
 
-    /**
-     * Parse raw OSRM route and turn-by-turn steps into real road-named health segments
-     */
+    
     _parseOSRMRouteToHealthSegments(osrmRoute, originName, destName, defaultHealth = 'good', nameSuffix = 'via Highway') {
         const coords = osrmRoute.geometry.coordinates.map(c => [c[1], c[0]]);
         const distanceKm = +(osrmRoute.distance / 1000).toFixed(1);
         const durationMin = Math.max(1, Math.round(osrmRoute.duration / 60));
 
-        // Extract real road names from OSRM steps
         const streetNames = [];
         if (osrmRoute.legs) {
             osrmRoute.legs.forEach(leg => {
@@ -198,7 +174,6 @@ class RoadHealthAPI {
             });
         }
 
-        // Partition coordinates into 3 to 5 real segments
         const numSegments = Math.min(5, Math.max(3, Math.floor(coords.length / 12) || 3));
         const chunkSize = Math.ceil(coords.length / numSegments);
         const segments = [];
@@ -241,9 +216,7 @@ class RoadHealthAPI {
         };
     }
 
-    /**
-     * Get ESP32 Fleet devices from database
-     */
+    
     async getESP32Fleet() {
         const data = await this._backendFetch('/devices');
         if (data && data.success) {
@@ -252,9 +225,7 @@ class RoadHealthAPI {
         return [];
     }
 
-    /**
-     * Register a new real ESP32 node device in the database
-     */
+    
     async registerDevice(deviceInfo) {
         return await this._backendFetch('/devices', {
             method: 'POST',
@@ -262,9 +233,7 @@ class RoadHealthAPI {
         });
     }
 
-    /**
-     * Get all detected potholes from database
-     */
+    
     async getPotholeTelemetry() {
         const data = await this._backendFetch('/potholes');
         if (data && data.success) {
@@ -273,9 +242,7 @@ class RoadHealthAPI {
         return [];
     }
 
-    /**
-     * Get latest real telemetry reading for a device
-     */
+    
     async getLatestIoTPayload(deviceId) {
         if (!deviceId) return null;
         const data = await this._backendFetch(`/telemetry/latest/${deviceId}`);
@@ -285,9 +252,7 @@ class RoadHealthAPI {
         return null;
     }
 
-    /**
-     * Report an anomaly / pothole location directly to the database
-     */
+    
     async reportAnomaly(anomaly) {
         return await this._backendFetch('/potholes', {
             method: 'POST',
@@ -302,9 +267,7 @@ class RoadHealthAPI {
         });
     }
 
-    /**
-     * Fetch real database stats
-     */
+    
     async syncPostGIS() {
         const data = await this._backendFetch('/routes/stats');
         if (data && data.success) {

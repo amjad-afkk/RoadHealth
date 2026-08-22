@@ -1,62 +1,51 @@
-/* ==========================================================================
-   RoadHealth — Apple Maps & Satellite Design System (Telangana IoT Fleet)
-   Pure White Cards, Glassmorphism, Micro-animations, and Refined Typography
-   ========================================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap');
 
 :root {
-    /* Apple Light Theme Color Palette */
+    
     --bg-app: #0F172A;
     --bg-card: #FFFFFF;
     --bg-card-subtle: #F8FAFC;
     --bg-glass: rgba(255, 255, 255, 0.90);
     --bg-glass-strong: rgba(255, 255, 255, 0.96);
     
-    /* Borders & Dividers */
+   
     --border-light: rgba(0, 0, 0, 0.08);
     --border-card: rgba(0, 0, 0, 0.08);
     --border-focus: #007AFF;
     
-    /* Text Hierarchy */
     --text-primary: #1D1D1F;
     --text-secondary: #6E6E73;
     --text-tertiary: #86868B;
     --text-inverse: #FFFFFF;
     
-    /* Accent & Health Tokens */
     --apple-blue: #007AFF;
     --apple-blue-subtle: #EBF5FF;
-    --health-good: #10B981;      /* Emerald Green */
+    --health-good: #10B981;      
     --health-good-bg: #ECFDF5;
-    --health-mod: #F59E0B;       /* Warm Amber */
+    --health-mod: #F59E0B;       
     --health-mod-bg: #FFFBEB;
-    --health-bad: #EF4444;       /* Crimson Red */
+    --health-bad: #EF4444;       
     --health-bad-bg: #FEF2F2;
     
-    /* Apple-style Layered Shadows */
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
     --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.08);
     --shadow-lg: 0 14px 38px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.04);
     --shadow-floating: 0 16px 44px -4px rgba(0, 0, 0, 0.16), 0 6px 18px -2px rgba(0, 0, 0, 0.08);
     --shadow-pill: 0 10px 30px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.04);
     
-    /* Radii */
     --radius-sm: 10px;
     --radius-md: 16px;
     --radius-lg: 22px;
     --radius-pill: 9999px;
     
-    /* Typography */
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-heading: 'Outfit', 'Inter', -apple-system, sans-serif;
     
-    /* Transitions */
     --anim-fast: 0.18s cubic-bezier(0.16, 1, 0.3, 1);
     --anim-smooth: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Reset & Box Sizing */
 *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
@@ -74,9 +63,6 @@ html, body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* ==========================================================================
-   Application Shell & Navigation Bar
-   ========================================================================== */
 #app-container {
     position: relative;
     width: 100vw;
@@ -198,7 +184,7 @@ html, body {
     box-shadow: 0 2px 6px rgba(0,0,0,0.15);
 }
 
-/* Settings & Admin Dropdown (Strict Requirement #4) */
+
 .settings-menu-container {
     position: relative;
     display: inline-block;
@@ -312,9 +298,6 @@ html, body {
     100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
-/* ==========================================================================
-   Map Container
-   ========================================================================== */
 #map-viewport {
     position: absolute;
     top: 0;
@@ -330,9 +313,6 @@ html, body {
     background-color: #0F172A;
 }
 
-/* ==========================================================================
-   Google & Apple Maps Floating Search & Origin/Destination Card
-   ========================================================================== */
 .floating-route-search-card {
     position: absolute;
     top: 80px;
@@ -540,7 +520,6 @@ html, body {
     color: var(--apple-blue);
 }
 
-/* Quick City Route Presets */
 .presets-section {
     display: flex;
     flex-direction: column;
@@ -588,7 +567,6 @@ html, body {
     border-color: var(--apple-blue);
 }
 
-/* Multiple Route Alternatives List */
 .route-alternatives-list {
     overflow-y: auto;
     display: flex;
@@ -692,9 +670,7 @@ html, body {
 .seg-yellow { background: var(--health-mod); }
 .seg-red { background: var(--health-bad); }
 
-/* ==========================================================================
-   Basemap Switcher Card (Satellite vs Street)
-   ========================================================================== */
+
 .basemap-switcher-card {
     position: absolute;
     bottom: 24px;
@@ -755,11 +731,6 @@ html, body {
     background-color: #F8FAFC;
 }
 
-/* ==========================================================================
-   Strict Requirement #3:
-   Floating Overall Route Summary Card
-   Positioned at absolute bottom-center (bottom: 24px; left: 50%; transform: translateX(-50%))
-   ========================================================================== */
 .floating-summary-card {
     position: absolute;
     bottom: 24px;
@@ -967,9 +938,6 @@ html, body {
 .legend-dot.yellow { background: var(--health-mod); }
 .legend-dot.red { background: var(--health-bad); }
 
-/* ==========================================================================
-   Map Floating Controls Stack (Right)
-   ========================================================================== */
 .map-controls-stack {
     position: absolute;
     right: 20px;
@@ -1022,9 +990,6 @@ html, body {
     border-bottom: 1px solid var(--border-light);
 }
 
-/* ==========================================================================
-   Admin Dashboard & ESP32 Bike Fleet Modal
-   ========================================================================== */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -1102,7 +1067,6 @@ html, body {
     gap: 16px;
 }
 
-/* Admin Sub-Tabs */
 .admin-tab-row {
     display: flex;
     gap: 6px;
@@ -1147,7 +1111,6 @@ html, body {
     display: flex;
 }
 
-/* ESP32 Bike Fleet Grid */
 .esp32-fleet-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
@@ -1194,7 +1157,6 @@ html, body {
     color: var(--text-secondary);
 }
 
-/* Battery Indicator Bar */
 .battery-status-wrap {
     display: flex;
     align-items: center;
@@ -1331,9 +1293,6 @@ html, body {
     background: #FAFAFC;
 }
 
-/* ==========================================================================
-   Leaflet Custom Markers & Route Styling
-   ========================================================================== */
 .leaflet-container {
     font-family: var(--font-sans) !important;
 }
@@ -1507,7 +1466,6 @@ html, body {
     margin-bottom: 2px;
 }
 
-/* Live Telemetry Sensor Stream Drawer (Right) */
 .iot-sensor-stream-card {
     position: absolute;
     top: 80px;
