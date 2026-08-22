@@ -40,9 +40,9 @@ router.post('/', async (req, res) => {
             iriEstimate = Math.min(iriEstimate, 1.2);
         }
 
-        const potholeTrigger = (body.potholeTrigger && speedKmh >= 3.0)
+        const potholeTrigger = body.potholeTrigger
             ? 1
-            : (dynamicDeviation > 21.5 && speedKmh >= 3.0 ? 1 : 0);
+            : (dynamicDeviation > 14.5 ? 1 : 0);
 
         let insertedId = null;
 

@@ -1,9 +1,9 @@
 const { isPostGIS, getPool, getDb } = require('../db/database');
 
 const CONFIG = {
-    Z_SPIKE_THRESHOLD_G: 2.2,
-    IRI_CRITICAL_THRESHOLD: 6.0,
-    IRI_MODERATE_THRESHOLD: 2.5,
+    Z_SPIKE_THRESHOLD_G: 1.5,
+    IRI_CRITICAL_THRESHOLD: 4.5,
+    IRI_MODERATE_THRESHOLD: 2.0,
     DEDUP_RADIUS_M: 10,
     GRAVITY: 9.81,
     RMS_WINDOW: 50,

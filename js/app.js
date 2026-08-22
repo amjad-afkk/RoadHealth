@@ -199,6 +199,23 @@ function selectAlternativeRoute(index) {
 }
 window.selectAlternativeRoute = selectAlternativeRoute;
 
+function recalculateCurrentRouteSummary() {
+    const route = AppState.selectedAnalyzedRoute;
+    if (!route || !route.segments) return;
+
+    const analyzed = window.roadHealthEngine.analyzeRoute(route);
+    if (analyzed) {
+        AppState.selectedAnalyzedRoute = { ...route, ...analyzed };
+        if (AppState.alternativeRoutes && AppState.alternativeRoutes[AppState.selectedRouteIndex]) {
+            AppState.alternativeRoutes[AppState.selectedRouteIndex] = AppState.selectedAnalyzedRoute;
+        }
+        updateFloatingSummaryCard(AppState.selectedAnalyzedRoute);
+        renderAlternativeRouteCards(AppState.alternativeRoutes, AppState.selectedRouteIndex);
+        drawRouteProfileChart(AppState.selectedAnalyzedRoute);
+    }
+}
+window.recalculateCurrentRouteSummary = recalculateCurrentRouteSummary;
+
 function renderAlternativeRouteCards(routes, selectedIndex = 0) {
     const listEl = document.getElementById('routeCardList');
     const headerEl = document.getElementById('altRouteHeader');
@@ -673,17 +690,17 @@ function updateTelemetryDashboard(payload) {
         subGyroEl.innerText = `${payload.gyro.pitch?.toFixed(1) || '0.0'}° / ${payload.gyro.roll?.toFixed(1) || '0.0'}°`;
     }
 
-    const isSpike = !isStationary && (payload.potholeTrigger === true || dynamicG >= 2.2);
+    const isSpike = !isStationary && (payload.potholeTrigger === true || dynamicG >= 1.5);
 
     if (bannerEl && bannerText && bannerIcon) {
         if (isSpike) {
             bannerEl.className = 'pothole-alert-banner alert-active';
-            bannerText.innerText = '🚨 POTHOLE IMPACT DETECTED (G-Spike > 2.2G)';
+            bannerText.innerText = '🚨 POTHOLE IMPACT DETECTED (G-Spike > 1.5G)';
             bannerIcon.setAttribute('data-lucide', 'alert-triangle');
             bannerIcon.style.color = '#EF4444';
         } else {
             bannerEl.className = 'pothole-alert-banner';
-            bannerText.innerText = isStationary ? 'Stationary Node / Zero Road Motion' : 'Road Surface Nominal (G-Force < 2.2G)';
+            bannerText.innerText = isStationary ? 'Stationary Node / Zero Road Motion' : 'Road Surface Nominal (G-Force < 1.5G)';
             bannerIcon.setAttribute('data-lucide', isStationary ? 'pause-circle' : 'shield-check');
             bannerIcon.style.color = '#10B981';
         }

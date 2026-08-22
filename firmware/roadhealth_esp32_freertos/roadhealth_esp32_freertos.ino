@@ -19,8 +19,8 @@ const char* DEVICE_ID     = "ESP32-NODE-TS09-EA-4412";
 
 #define SAMPLE_RATE_HZ        200
 #define SAMPLE_DELAY_MS       (1000 / SAMPLE_RATE_HZ)
-#define Z_SPIKE_THRESHOLD_G   2.2
-#define IRI_POTHOLE_THRESHOLD 6.0
+#define Z_SPIKE_THRESHOLD_G   1.5
+#define IRI_POTHOLE_THRESHOLD 4.0
 #define BASELINE_ALPHA        0.02
 #define GRAVITY_MS2           9.81
 

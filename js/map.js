@@ -235,6 +235,7 @@ class RoadHealthMap {
                 lineCap: 'round',
                 lineJoin: 'round'
             });
+            coreLine._segmentRef = seg;
 
             coreLine.on('click', () => {
                 if (typeof window.onSegmentClick === 'function') {
@@ -382,12 +383,66 @@ class RoadHealthMap {
 
     removePotholeMarker(id) {
         const normId = String(id).toLowerCase();
+        let removedLat = null, removedLng = null;
+
         this.layers.potholeMarkerGroup.eachLayer(layer => {
             if (layer._potholeId && String(layer._potholeId).toLowerCase() === normId) {
+                if (layer.getLatLng) {
+                    const ll = layer.getLatLng();
+                    removedLat = ll.lat;
+                    removedLng = ll.lng;
+                }
                 this.layers.potholeMarkerGroup.removeLayer(layer);
             }
         });
+
         if (this.map) this.map.closePopup();
+
+        this.layers.routeGroup.eachLayer(layer => {
+            if (layer._segmentRef && layer.setStyle) {
+                const seg = layer._segmentRef;
+                const coords = seg.coords || [];
+
+                let isNearRemoved = false;
+                if (removedLat !== null) {
+                    for (const pt of coords) {
+                        const d = Math.hypot(pt[0] - removedLat, pt[1] - removedLng) * 111320;
+                        if (d <= 40) {
+                            isNearRemoved = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (isNearRemoved || !this.hasAnyPotholeNearSegment(coords)) {
+                    seg.health = 'good';
+                    seg.potholeCount = 0;
+                    seg.iri = 1.1;
+                    layer.setStyle({ color: '#10B981' });
+                }
+            }
+        });
+
+        if (typeof window.recalculateCurrentRouteSummary === 'function') {
+            window.recalculateCurrentRouteSummary();
+        }
+    }
+
+    hasAnyPotholeNearSegment(coords) {
+        let found = false;
+        this.layers.potholeMarkerGroup.eachLayer(layer => {
+            if (layer.getLatLng) {
+                const ll = layer.getLatLng();
+                for (const pt of coords) {
+                    const d = Math.hypot(pt[0] - ll.lat, pt[1] - ll.lng) * 111320;
+                    if (d <= 30) {
+                        found = true;
+                        return;
+                    }
+                }
+            }
+        });
+        return found;
     }
 
     updateVehiclePosition(lat, lng) {
