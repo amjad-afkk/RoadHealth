@@ -1,16 +1,7 @@
-/**
- * RoadHealth — Devices API Routes (PostGIS & SQLite Compatible)
- * Register and manage real ESP32 fleet nodes
- */
-
 const express = require('express');
 const router = express.Router();
 const { isPostGIS, getPool, getDb } = require('../db/database');
 
-/**
- * GET /api/v1/devices
- * List all registered ESP32 fleet devices
- */
 router.get('/', async (req, res) => {
     try {
         let devices = [];
@@ -52,10 +43,6 @@ router.get('/', async (req, res) => {
     }
 });
 
-/**
- * POST /api/v1/devices
- * Register a new real ESP32 fleet node
- */
 router.post('/', async (req, res) => {
     const { id, bikePlate, bikeModel, riderName, location, firmware, gpsSensor, networkInfo } = req.body;
 
@@ -116,9 +103,6 @@ router.post('/', async (req, res) => {
     }
 });
 
-/**
- * GET /api/v1/devices/:id
- */
 router.get('/:id', async (req, res) => {
     try {
         let device = null;

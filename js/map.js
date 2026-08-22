@@ -1,8 +1,3 @@
-/**
- * RoadHealth — Multi-Basemap GIS Engine (Leaflet + Heatmap + PostGIS Layers)
- * Supports Google Hybrid Satellite, Esri World Imagery, CartoDB Light & Dark Matter.
- */
-
 class RoadHealthMap {
     constructor(containerId = 'map') {
         this.containerId = containerId;
@@ -12,7 +7,6 @@ class RoadHealthMap {
         this.selectedRoute = null;
         this.currentBasemapType = 'google-satellite';
 
-        // Tile layer references
         this.tileLayers = {
             'google-satellite': null,
             'esri-satellite': null,
@@ -20,7 +14,6 @@ class RoadHealthMap {
             'dark': null
         };
 
-        // Layer groups
         this.layers = {
             altRoutesGroup: L.layerGroup(),
             casingGroup: L.layerGroup(),
@@ -40,18 +33,14 @@ class RoadHealthMap {
         this.initMap();
     }
 
-    /**
-     * Initialize Leaflet map centered on Telangana (Hyderabad)
-     */
     initMap() {
         this.map = L.map(this.containerId, {
-            center: [17.4435, 78.3772], // Hitec City, Hyderabad, Telangana
+            center: [17.4435, 78.3772],
             zoom: 13,
             zoomControl: false,
             attributionControl: false
         });
 
-        // 1. Google Hybrid Satellite
         this.tileLayers['google-satellite'] = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             subdomains: ['0', '1', '2', '3'],
             maxZoom: 22,
@@ -59,14 +48,12 @@ class RoadHealthMap {
             attribution: '&copy; Google Maps Satellite'
         });
 
-        // 2. Esri World Imagery (High-Res 100% Free Satellite)
         this.tileLayers['esri-satellite'] = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 22,
             maxNativeZoom: 18,
             attribution: '&copy; Esri World Imagery'
         });
 
-        // 3. CartoDB Positron Light
         this.tileLayers['street'] = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             subdomains: 'abcd',
             maxZoom: 22,
@@ -74,7 +61,6 @@ class RoadHealthMap {
             attribution: '&copy; CartoDB Positron'
         });
 
-        // 4. CartoDB Dark Matter
         this.tileLayers['dark'] = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             subdomains: 'abcd',
             maxZoom: 22,
@@ -82,15 +68,12 @@ class RoadHealthMap {
             attribution: '&copy; CartoDB Dark Matter'
         });
 
-        // Set default basemap
         this.tileLayers['google-satellite'].addTo(this.map);
 
-        // Attribution in bottom right
         L.control.attribution({ position: 'bottomright', prefix: false })
             .addAttribution('RoadHealth &bull; PostGIS Spatial Engine')
             .addTo(this.map);
 
-        // Add feature layer groups in z-order
         this.layers.altRoutesGroup.addTo(this.map);
         this.layers.casingGroup.addTo(this.map);
         this.layers.routeGroup.addTo(this.map);
@@ -99,7 +82,6 @@ class RoadHealthMap {
         this.layers.poiMarkerGroup.addTo(this.map);
         this.layers.vehicleGroup.addTo(this.map);
 
-        // Zoom-dependent crack overlay listeners
         this.map.on('zoomend', () => this.handleZoomChange());
         this.map.on('moveend', () => {
             if (this.map.getZoom() >= 16) {
@@ -110,9 +92,6 @@ class RoadHealthMap {
         console.log('[RoadHealth Map] Initialized with Multi-Basemaps & PostGIS.');
     }
 
-    /**
-     * Switch Basemap Layer ('google-satellite' | 'esri-satellite' | 'street' | 'dark')
-     */
     setBasemap(type) {
         if (!this.tileLayers[type]) type = 'google-satellite';
         this.currentBasemapType = type;
@@ -128,9 +107,6 @@ class RoadHealthMap {
         console.log(`[RoadHealth Map] Basemap switched to: ${type}`);
     }
 
-    /**
-     * Render Dynamic Road Roughness Heatmap Layer
-     */
     renderHeatmap(points, isVisible = true) {
         this.isHeatmapActive = isVisible;
 
@@ -148,26 +124,22 @@ class RoadHealthMap {
                 maxZoom: 17,
                 max: 1.0,
                 gradient: {
-                    0.2: '#10B981', // Green
-                    0.5: '#F59E0B', // Amber
-                    0.8: '#EF4444', // Red
-                    1.0: '#991B1B'  // Dark Red
+                    0.2: '#10B981',
+                    0.5: '#F59E0B',
+                    0.8: '#EF4444',
+                    1.0: '#991B1B'
                 }
             });
             this.layers.heatmapLayer.addTo(this.map);
         }
     }
 
-    /**
-     * Render Multiple Alternative Routes on the map simultaneously
-     */
     renderMultipleRoutes(routesList, selectedIndex = 0) {
         this.allRoutes = routesList;
         this.selectedIndex = selectedIndex;
         this.selectedRoute = routesList[selectedIndex] || routesList[0];
         this.activeRedSegments = [];
 
-        // Clear layers
         this.layers.altRoutesGroup.clearLayers();
         this.layers.casingGroup.clearLayers();
         this.layers.routeGroup.clearLayers();
@@ -175,7 +147,6 @@ class RoadHealthMap {
 
         if (!routesList || routesList.length === 0) return;
 
-        // 1. Render Unselected (Alternative) Routes in muted semi-transparent gray
         routesList.forEach((route, idx) => {
             if (idx === selectedIndex) return;
 
@@ -210,7 +181,6 @@ class RoadHealthMap {
             }
         });
 
-        // 2. Render Selected Primary Route with segment color-coding
         const primaryRoute = this.selectedRoute;
         if (!primaryRoute || !primaryRoute.segments) return;
 
@@ -227,7 +197,6 @@ class RoadHealthMap {
                 this.activeRedSegments.push(seg);
             }
 
-            // Outer crisp white casing
             const casing = L.polyline(seg.coords, {
                 color: '#FFFFFF',
                 weight: 10,
@@ -237,7 +206,6 @@ class RoadHealthMap {
             });
             this.layers.casingGroup.addLayer(casing);
 
-            // Core health colored polyline
             const coreLine = L.polyline(seg.coords, {
                 color: color,
                 weight: 6,
@@ -267,10 +235,8 @@ class RoadHealthMap {
             this.layers.routeGroup.addLayer(coreLine);
         });
 
-        // 3. Render Origin & Destination POI Markers
         this.renderOriginDestMarkers(primaryRoute);
 
-        // 4. Fit Map Bounds
         if (allSelectedCoords.length > 0) {
             this.map.fitBounds(L.latLngBounds(allSelectedCoords), {
                 padding: [80, 80],
@@ -280,13 +246,9 @@ class RoadHealthMap {
             });
         }
 
-        // 5. Update Distress Overlays
         this.handleZoomChange();
     }
 
-    /**
-     * Render Origin and Destination Map Pins
-     */
     renderOriginDestMarkers(route) {
         this.layers.poiMarkerGroup.clearLayers();
         if (!route || !route.origin || !route.destination) return;
@@ -315,9 +277,6 @@ class RoadHealthMap {
         this.layers.poiMarkerGroup.addLayer(destMarker);
     }
 
-    /**
-     * Render Detected Potholes with PostGIS Status Lifecycle
-     */
     renderPotholes(potholesList, isVisible = true) {
         this.layers.potholeMarkerGroup.clearLayers();
         if (!isVisible || !potholesList || potholesList.length === 0) return;
@@ -382,9 +341,6 @@ class RoadHealthMap {
         });
     }
 
-    /**
-     * Update Live Vehicle / Virtual Bike Marker on the Map
-     */
     updateVehiclePosition(lat, lng) {
         if (!lat || !lng) return;
 
@@ -406,9 +362,6 @@ class RoadHealthMap {
         }
     }
 
-    /**
-     * Handle Zoom Changes for Dynamic SVG Crack/Distress Overlays
-     */
     handleZoomChange() {
         const zoom = this.map.getZoom();
         if (zoom >= 16) {
@@ -419,9 +372,6 @@ class RoadHealthMap {
         }
     }
 
-    /**
-     * Draw Zoom-Dependent Dynamic SVG Crack Overlays on Degraded Road Segments
-     */
     updateCrackOverlays() {
         this.layers.crackOverlayGroup.clearLayers();
         if (!this.activeRedSegments || this.activeRedSegments.length === 0) return;
@@ -449,9 +399,6 @@ class RoadHealthMap {
         this.isCrackLayerActive = true;
     }
 
-    /**
-     * Generate Zigzag Coordinates for photorealistic surface distress
-     */
     generateZigzagCoordinates(pt1, pt2, steps = 6) {
         const coords = [pt1];
         const dLat = (pt2[0] - pt1[0]) / steps;
@@ -469,9 +416,6 @@ class RoadHealthMap {
         return coords;
     }
 
-    /**
-     * Focus on first critical distress zone
-     */
     focusOnDistressZone() {
         if (this.activeRedSegments && this.activeRedSegments.length > 0) {
             const firstRed = this.activeRedSegments[0];

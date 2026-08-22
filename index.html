@@ -6,27 +6,25 @@
     <title>RoadHealth — Telangana IoT Road Intelligence & Satellite Navigation</title>
     <meta name="description" content="Next-generation IoT road surface intelligence, PostGIS spatial database, real-time roughness indexing, and multi-basemap navigation platform.">
 
-    <!-- Google Fonts: Inter & Outfit -->
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
 
-    <!-- Leaflet CSS -->
+    
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 
-    <!-- Lucide Icons -->
+    
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- Apple Maps Glassmorphism Stylesheet -->
+    
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
     <div id="app-container">
-        <!-- ============================================================
-             1. Apple & Google Maps Floating Top Navigation & Search Bar
-             ============================================================ -->
+        
         <header class="top-nav-bar" id="main-header">
-            <!-- Brand & Logo Pill -->
+            
             <div class="nav-cluster">
                 <div class="glass-pill brand-pill">
                     <div class="brand-icon-wrap">
@@ -39,7 +37,7 @@
                 </div>
             </div>
 
-            <!-- Central Navigation Menu Tabs -->
+            
             <div class="nav-cluster">
                 <nav class="nav-menu-bar" aria-label="Main Navigation">
                     <button class="nav-tab-btn active" id="tab-search" onclick="toggleRoutePanel()">
@@ -63,7 +61,7 @@
                         <span>Live IoT Node</span>
                     </button>
 
-                    <!-- Settings & Basemap Menu Container -->
+                    
                     <div class="settings-menu-container" id="settingsMenuContainer">
                         <button class="nav-tab-btn settings-btn" id="settingsMenuBtn" onclick="toggleSettingsDropdown(event)">
                             <i data-lucide="layers" style="width: 16px; height: 16px;"></i>
@@ -71,7 +69,7 @@
                             <i data-lucide="chevron-down" class="dropdown-caret" style="width: 14px; height: 14px;"></i>
                         </button>
 
-                        <!-- Basemap & Action Dropdown Menu -->
+                        
                         <div class="settings-dropdown-menu" id="settingsDropdown">
                             <div class="dropdown-header">Satellite &amp; Vector Basemaps</div>
                             <button class="dropdown-item" onclick="toggleMapTheme('google-satellite')">
@@ -115,7 +113,7 @@
                 </nav>
             </div>
 
-            <!-- Right Telemetry & Status Pill -->
+            
             <div class="nav-cluster">
                 <div class="glass-pill telemetry-status-pill">
                     <div class="status-pulse-dot"></div>
@@ -124,16 +122,12 @@
             </div>
         </header>
 
-        <!-- ============================================================
-             2. Full-Screen Map Viewport
-             ============================================================ -->
+        
         <main id="map-viewport">
             <div id="map"></div>
         </main>
 
-        <!-- ============================================================
-             3. Floating Search & Origin/Destination Widget
-             ============================================================ -->
+        
         <aside class="floating-route-search-card" id="floatingSearchCard" aria-label="Route Planning Search">
             <div class="search-card-header">
                 <div class="search-card-title">
@@ -145,7 +139,7 @@
                 </button>
             </div>
 
-            <!-- Origin & Destination Inputs with Photon Sub-50ms Autocomplete -->
+            
             <div class="route-input-group-container">
                 <div class="input-route-connector">
                     <div class="connector-dot start"></div>
@@ -176,7 +170,7 @@
                 </button>
             </div>
 
-            <!-- Telangana Quick Preset Route Pills -->
+            
             <div class="preset-routes-bar">
                 <button class="preset-pill active" onclick="loadPresetRoute('hyd_airport')">
                     <i data-lucide="plane" style="width: 12px; height: 12px;"></i>
@@ -192,24 +186,22 @@
                 </button>
             </div>
 
-            <!-- Alternative Route Cards -->
+            
             <div class="alt-routes-container">
                 <div class="alt-routes-header" id="altRouteHeader">Available Route Options</div>
                 <div class="route-cards-list" id="routeCardList">
-                    <!-- Populated by JavaScript -->
+                    
                 </div>
             </div>
 
-            <!-- Action Button -->
+            
             <button class="primary-search-btn" onclick="handleCustomRouteSearch()">
                 <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>
                 <span id="btnRouteText">Find Alternative Routes</span>
             </button>
         </aside>
 
-        <!-- ============================================================
-             4. Floating Route Summary Pill (Top-Right of Map)
-             ============================================================ -->
+        
         <div class="floating-route-summary-card" id="floatingSummaryCard">
             <div class="summary-card-header">
                 <div class="eta-time" id="summaryEtaTime">-- min</div>
@@ -218,7 +210,7 @@
             </div>
             <div class="summary-sub-detail" id="summaryPotholeCount">0 Potholes in PostGIS</div>
             
-            <!-- Segment Health Proportion Bar -->
+            
             <div class="health-progress-bar">
                 <div class="seg-good" id="barSegGreen" style="width: 100%;"></div>
                 <div class="seg-mod" id="barSegYellow" style="width: 0%;"></div>
@@ -237,9 +229,7 @@
             </button>
         </div>
 
-        <!-- ============================================================
-             5. Live IoT Sensor Waveform Visualizer Drawer (Bottom Left)
-             ============================================================ -->
+        
         <aside class="iot-sensor-drawer" id="iotSensorCard">
             <div class="drawer-header">
                 <div class="drawer-title">
@@ -279,9 +269,7 @@
             </div>
         </aside>
 
-        <!-- ============================================================
-             6. Collapsible Route Roughness & IRI Profile Bottom Drawer
-             ============================================================ -->
+        
         <div class="route-roughness-drawer hidden" id="roughnessProfileDrawer">
             <div class="profile-drawer-header">
                 <div class="profile-title-wrap">
@@ -302,9 +290,7 @@
             </div>
         </div>
 
-        <!-- ============================================================
-             7. Municipal Report Export Modal
-             ============================================================ -->
+        
         <div class="modal-backdrop" id="exportModalOverlay" onclick="closeExportModalOnBackdrop(event)">
             <div class="admin-modal-card" style="max-width: 500px;">
                 <div class="modal-header">
@@ -343,9 +329,7 @@
             </div>
         </div>
 
-        <!-- ============================================================
-             8. Admin Dashboard Modal
-             ============================================================ -->
+        
         <div class="modal-backdrop" id="adminModalOverlay" onclick="closeAdminModalOnBackdrop(event)">
             <div class="admin-modal-card">
                 <div class="modal-header">
@@ -374,7 +358,7 @@
                 </div>
 
                 <div class="modal-body">
-                    <!-- TAB 1: ESP32 BIKE FLEET GRID -->
+                    
                     <div id="adminTabContentFleet" class="admin-tab-pane active">
                         <div class="admin-section-title" style="display: flex; justify-content: space-between; align-items: center;">
                             <span>Active ESP32 IoT Nodes Deployed on Bikes</span>
@@ -383,7 +367,7 @@
                         <div class="esp32-fleet-grid" id="esp32FleetGrid"></div>
                     </div>
 
-                    <!-- TAB 2: SENSOR CALIBRATION -->
+                    
                     <div id="adminTabContentSettings" class="admin-tab-pane">
                         <div class="admin-section-title">MPU6050 &amp; Roughness Thresholds</div>
                         <div style="display: flex; flex-direction: column; gap: 16px;">
@@ -413,7 +397,7 @@
                         </div>
                     </div>
 
-                    <!-- TAB 3: BACKEND & POSTGIS -->
+                    
                     <div id="adminTabContentBackend" class="admin-tab-pane">
                         <div class="admin-section-title">PostGIS Spatial Database Status</div>
                         <div style="background: #F8FAFC; border: 1px solid rgba(0,0,0,0.06); border-radius: 10px; padding: 14px; display: flex; align-items: center; justify-content: space-between;">
@@ -437,11 +421,11 @@
         </div>
     </div>
 
-    <!-- Leaflet JS & Leaflet Heatmap Plugin -->
+    
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 
-    <!-- Application Modules -->
+    
     <script src="js/api.js"></script>
     <script src="js/healthEngine.js"></script>
     <script src="js/map.js"></script>

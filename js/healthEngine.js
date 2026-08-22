@@ -1,33 +1,24 @@
-/**
- * RoadHealth - Health & Intelligence Analytics Engine
- * Provides GIS mathematical calculations, composite Road Health Index (RHI),
- * segment ratio weighting, ETA penalty adjustments, and anomaly classification.
- */
-
 class RoadHealthEngine {
     constructor() {
         this.weights = {
-            iri: 0.45,           
+            iri: 0.45,
             potholeDensity: 0.35,
-            vibration: 0.20      
+            vibration: 0.20
         };
 
-        
         this.speedModifiers = {
-            good: 1.0,           
-            moderate: 0.85,      
-            bad: 0.60            
+            good: 1.0,
+            moderate: 0.85,
+            bad: 0.60
         };
     }
 
-    
     updateWeights(newWeights) {
         this.weights = { ...this.weights, ...newWeights };
     }
 
-    
     haversineDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371e3; 
+        const R = 6371e3;
         const φ1 = lat1 * Math.PI / 180;
         const φ2 = lat2 * Math.PI / 180;
         const Δφ = (lat2 - lat1) * Math.PI / 180;
@@ -41,7 +32,6 @@ class RoadHealthEngine {
         return R * c;
     }
 
-   
     calculatePolylineLengthMeters(coords) {
         let total = 0;
         for (let i = 0; i < coords.length - 1; i++) {
@@ -53,7 +43,6 @@ class RoadHealthEngine {
         return total;
     }
 
-    
     analyzeRoute(route) {
         if (!route || !route.segments || route.segments.length === 0) {
             return null;
@@ -87,7 +76,7 @@ class RoadHealthEngine {
             weightedIriSum += segIri * segLengthM;
             weightedVibrationSum += segVib * segLengthM;
 
-            const nominalSpeedKmh = 60; 
+            const nominalSpeedKmh = 60;
             const speedMod = this.speedModifiers[health] || 1.0;
             const actualSpeedMs = (nominalSpeedKmh * speedMod) / 3.6;
             const segDurationSec = actualSpeedMs > 0 ? (segLengthM / actualSpeedMs) : 60;
@@ -163,16 +152,15 @@ class RoadHealthEngine {
     getHealthColor(health) {
         switch (health) {
             case 'good':
-                return '#10B981'; // Apple Emerald Green
+                return '#10B981';
             case 'moderate':
-                return '#F59E0B'; // Apple Warm Amber
+                return '#F59E0B';
             case 'bad':
-                return '#EF4444'; // Apple Crimson Red
+                return '#EF4444';
             default:
-                return '#3B82F6'; // Fallback Apple Blue
+                return '#3B82F6';
         }
     }
-
 
     getHealthBadge(health) {
         switch (health) {

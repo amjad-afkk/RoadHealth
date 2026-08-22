@@ -1,18 +1,9 @@
-/**
- * RoadHealth — Routes Analysis API (PostGIS & Spatial Intelligence)
- * Analyze road health for route segments using stored telemetry and PostGIS
- */
-
 const express = require('express');
 const router = express.Router();
 const { analyzeRouteHealth, getDatabaseStats } = require('../services/healthScorer');
 const { getConfig, updateThresholds } = require('../services/detectionEngine');
 const { getEngineInfo } = require('../db/database');
 
-/**
- * POST /api/v1/routes/analyze
- * Analyze a route's segments against stored telemetry and pothole data
- */
 router.post('/analyze', async (req, res) => {
     try {
         const { segments } = req.body;
@@ -37,10 +28,6 @@ router.post('/analyze', async (req, res) => {
     }
 });
 
-/**
- * GET /api/v1/routes/stats
- * Get database-wide statistics and PostGIS engine information
- */
 router.get('/stats', async (req, res) => {
     try {
         const stats = await getDatabaseStats();
@@ -63,10 +50,6 @@ router.get('/stats', async (req, res) => {
     }
 });
 
-/**
- * PUT /api/v1/routes/config
- * Update detection engine thresholds
- */
 router.put('/config', (req, res) => {
     try {
         const { zSpikeThreshold, iriCriticalThreshold, iriModerateThreshold, dedupRadiusM } = req.body;

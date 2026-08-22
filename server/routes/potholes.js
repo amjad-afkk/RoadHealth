@@ -1,17 +1,8 @@
-/**
- * RoadHealth — Potholes API Routes (PostGIS & Advanced GIS Suite)
- * Query, heatmap density, GeoJSON/CSV export, and defect lifecycle management
- */
-
 const express = require('express');
 const router = express.Router();
 const { isPostGIS, getPool, getDb } = require('../db/database');
 const { haversineDistance } = require('../services/detectionEngine');
 
-/**
- * GET /api/v1/potholes
- * List all detected potholes
- */
 router.get('/', async (req, res) => {
     try {
         let potholes = [];
@@ -86,10 +77,6 @@ router.get('/', async (req, res) => {
     }
 });
 
-/**
- * GET /api/v1/potholes/heatmap
- * Returns weighted coordinate arrays [lat, lng, intensity] for Leaflet.heat
- */
 router.get('/heatmap', async (req, res) => {
     try {
         let points = [];
@@ -113,13 +100,11 @@ router.get('/heatmap', async (req, res) => {
             `).all();
         }
 
-        // Intensity normalized 0.3 - 1.0 based on severity and IRI
         const heatmapData = points.map(p => {
             let weight = 0.4;
             if (p.severity === 'critical' || p.iri >= 4.5) weight = 0.95;
             else if (p.iri >= 2.5) weight = 0.65;
 
-            // Boost slightly by cluster size
             if (p.cluster_size > 1) {
                 weight = Math.min(1.0, weight + (p.cluster_size * 0.05));
             }
@@ -138,10 +123,6 @@ router.get('/heatmap', async (req, res) => {
     }
 });
 
-/**
- * GET /api/v1/potholes/export
- * Export road defects in standard GeoJSON (RFC 7946) or CSV
- */
 router.get('/export', async (req, res) => {
     try {
         const format = (req.query.format || 'geojson').toLowerCase();
@@ -177,7 +158,6 @@ router.get('/export', async (req, res) => {
             return res.send(headers + rows);
         }
 
-        // Standard RFC 7946 GeoJSON FeatureCollection
         const geojson = {
             type: 'FeatureCollection',
             name: 'Telangana_RoadHealth_Defects',
@@ -214,10 +194,6 @@ router.get('/export', async (req, res) => {
     }
 });
 
-/**
- * PATCH /api/v1/potholes/:id/status
- * Update repair lifecycle status ('reported', 'verified', 'in_progress', 'repaired')
- */
 router.patch('/:id/status', async (req, res) => {
     try {
         const { status, contractor } = req.body;
@@ -258,9 +234,6 @@ router.patch('/:id/status', async (req, res) => {
     }
 });
 
-/**
- * GET /api/v1/potholes/near
- */
 router.get('/near', async (req, res) => {
     try {
         const { lat, lng, radius } = req.query;
@@ -342,9 +315,6 @@ router.get('/near', async (req, res) => {
     }
 });
 
-/**
- * POST /api/v1/potholes
- */
 router.post('/', async (req, res) => {
     try {
         const { lat, lng, severity, iri, depthCm, sourceDevice } = req.body;
@@ -395,9 +365,6 @@ router.post('/', async (req, res) => {
     }
 });
 
-/**
- * DELETE /api/v1/potholes/:id
- */
 router.delete('/:id', async (req, res) => {
     try {
         const numericId = parseInt(req.params.id.replace('p-', ''));

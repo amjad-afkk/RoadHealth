@@ -1,9 +1,3 @@
-/**
- * RoadHealth — Express + WebSocket Server Entry Point (PostGIS & SQLite Unified)
- * 
- * Starts HTTP API server, PostGIS spatial database connection, and WebSocket hub.
- */
-
 require('dotenv').config();
 
 const express = require('express');
@@ -13,7 +7,6 @@ const path = require('path');
 const { init: initDb } = require('./db/database');
 const { init: initWS } = require('./ws/realtimeHub');
 
-// Route modules
 const devicesRouter = require('./routes/devices');
 const telemetryRouter = require('./routes/telemetry');
 const potholesRouter = require('./routes/potholes');
@@ -22,27 +15,22 @@ const routesRouter = require('./routes/routes');
 const PORT = process.env.PORT || 8000;
 const DB_PATH = process.env.DB_PATH || './db/roadhealth_live.db';
 
-// Initialize Express app
 const app = express();
 
-// Middleware
 app.use(cors({
-    origin: '*',  // Allow all origins for development (file://, localhost, etc.)
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '5mb' }));
 
-// Serve frontend static files from parent directory
 app.use(express.static(path.join(__dirname, '..')));
 
-// API Routes
 app.use('/api/v1/devices', devicesRouter);
 app.use('/api/v1/telemetry', telemetryRouter);
 app.use('/api/v1/potholes', potholesRouter);
 app.use('/api/v1/routes', routesRouter);
 
-// Health check
 app.get('/api/v1/health', (req, res) => {
     const { getClientCount } = require('./ws/realtimeHub');
     const { getEngineInfo } = require('./db/database');
@@ -60,17 +48,14 @@ app.get('/api/v1/health', (req, res) => {
     });
 });
 
-// Create HTTP server
 const server = http.createServer(app);
 
-// Start server after database initialization
 async function startServer() {
     try {
         console.log('[Server] Connecting & initializing database...');
         const dbInfo = await initDb(DB_PATH);
         console.log(`[Server] Active Database: ${dbInfo.type.toUpperCase()} (${dbInfo.version})`);
 
-        // Initialize WebSocket hub
         initWS(server);
 
         server.listen(PORT, () => {

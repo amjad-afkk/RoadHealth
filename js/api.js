@@ -1,8 +1,3 @@
-/**
- * RoadHealth — REST API Client & GIS Routing Engine
- * Integrates PostGIS Backend, Photon Sub-50ms Geocoding, and OSRM Navigation.
- */
-
 class RoadHealthAPI {
     constructor() {
         this.config = {
@@ -10,7 +5,6 @@ class RoadHealthAPI {
             timeoutMs: 10000
         };
 
-        // If running from file://, default to localhost:8000
         if (window.location.protocol === 'file:') {
             this.config.baseUrl = 'http://localhost:8000/api/v1';
         }
@@ -40,16 +34,11 @@ class RoadHealthAPI {
         }
     }
 
-    /**
-     * Sub-50ms Keystroke Autocomplete using Photon API (Komoot / OSM) with Telangana Geographic Bias
-     * Automatically falls back to OpenStreetMap Nominatim if needed.
-     */
     async geocodeAddress(query) {
         if (!query || query.trim().length < 2) return [];
 
         const cleanQuery = query.trim();
 
-        // 1. Primary: Photon OSM API (Sub-50ms, No API Key, Hyderabad Centered)
         try {
             const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(cleanQuery)}&lat=17.4435&lon=78.3772&limit=6&lang=en`;
             const res = await fetch(photonUrl, { signal: AbortSignal.timeout(3000) });
@@ -74,7 +63,6 @@ class RoadHealthAPI {
             console.warn('[RoadHealth API] Photon search timeout, falling back to Nominatim:', photonErr.message);
         }
 
-        // 2. Secondary Fallback: Nominatim OpenStreetMap
         try {
             const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQuery)}&countrycodes=in&limit=6&addressdetails=1`;
             const res = await fetch(url, { headers: { 'Accept-Language': 'en' }, signal: AbortSignal.timeout(4000) });
@@ -97,14 +85,10 @@ class RoadHealthAPI {
         return [];
     }
 
-    /**
-     * Calculate Multiple Routes between Origin and Destination via OSRM
-     */
     async calculateMultipleRoutesBetween(origin, dest, originName = 'Origin', destName = 'Destination') {
         const routesList = [];
 
         try {
-            // Direct OSRM request with alternatives enabled
             const directUrl = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${dest.lng},${dest.lat}?overview=full&geometries=geojson&alternatives=true&steps=true`;
             const directRes = await fetch(directUrl, { signal: AbortSignal.timeout(8000) });
             
@@ -125,7 +109,6 @@ class RoadHealthAPI {
                 }
             }
 
-            // If OSRM only returned 1 route, generate via-points for alternative corridor routes
             if (routesList.length < 2) {
                 const midLat = (origin.lat + dest.lat) / 2;
                 const midLng = (origin.lng + dest.lng) / 2;
@@ -145,7 +128,7 @@ class RoadHealthAPI {
                             routesList.push(parsed);
                         }
                     }
-                } catch (e) { /* ignore fallback error */ }
+                } catch (e) { }
             }
 
             return routesList;
@@ -204,25 +187,16 @@ class RoadHealthAPI {
         };
     }
 
-    /**
-     * Get Potholes from PostGIS
-     */
     async getPotholeTelemetry() {
         const res = await this._backendFetch('/potholes?limit=500');
         return res?.potholes || [];
     }
 
-    /**
-     * Get Heatmap Points from PostGIS
-     */
     async getHeatmapPoints() {
         const res = await this._backendFetch('/potholes/heatmap');
         return res?.points || [];
     }
 
-    /**
-     * Update Pothole Lifecycle Status
-     */
     async updatePotholeStatus(id, status, contractor = null) {
         return await this._backendFetch(`/potholes/${id}/status`, {
             method: 'PATCH',
@@ -230,18 +204,12 @@ class RoadHealthAPI {
         });
     }
 
-    /**
-     * Delete / Flag Pothole False Positive
-     */
     async flagFalsePositive(id) {
         return await this._backendFetch(`/potholes/${id}`, {
             method: 'DELETE'
         });
     }
 
-    /**
-     * Start Virtual Patrol Bike Simulation
-     */
     async simulatePatrolBike(routeCoords = null) {
         return await this._backendFetch('/telemetry/simulate', {
             method: 'POST',
@@ -249,17 +217,11 @@ class RoadHealthAPI {
         });
     }
 
-    /**
-     * Get ESP32 Fleet Nodes
-     */
     async getESP32Fleet() {
         const res = await this._backendFetch('/devices');
         return res?.devices || [];
     }
 
-    /**
-     * Get PostGIS Spatial Database Diagnostics
-     */
     async syncPostGIS() {
         const res = await this._backendFetch('/routes/stats');
         return {

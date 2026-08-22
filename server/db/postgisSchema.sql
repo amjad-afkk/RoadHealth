@@ -1,12 +1,5 @@
--- ============================================================
--- RoadHealth PostGIS Database Schema
--- PostgreSQL + PostGIS Extension (Native Spatial GiST Indexing)
--- ============================================================
-
--- 1. Enable PostGIS Extension
 CREATE EXTENSION IF NOT EXISTS postgis;
 
--- 2. ESP32 IoT Fleet Devices
 CREATE TABLE IF NOT EXISTS devices (
     id                  VARCHAR(100) PRIMARY KEY,
     bike_plate          VARCHAR(50) NOT NULL,
@@ -27,7 +20,6 @@ CREATE TABLE IF NOT EXISTS devices (
     created_at          TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Raw Telemetry Readings (high-frequency inserts from ESP32 devices)
 CREATE TABLE IF NOT EXISTS telemetry (
     id                  SERIAL PRIMARY KEY,
     device_id           VARCHAR(100) NOT NULL REFERENCES devices(id),
@@ -47,19 +39,18 @@ CREATE TABLE IF NOT EXISTS telemetry (
     raw_json            TEXT DEFAULT NULL
 );
 
--- 4. Detected Potholes / Road Anomalies
 CREATE TABLE IF NOT EXISTS potholes (
     id                  SERIAL PRIMARY KEY,
     lat                 DOUBLE PRECISION NOT NULL,
     lng                 DOUBLE PRECISION NOT NULL,
     geom                GEOMETRY(Point, 4326),
-    severity            VARCHAR(20) NOT NULL DEFAULT 'moderate',   -- moderate | critical
+    severity            VARCHAR(20) NOT NULL DEFAULT 'moderate',
     iri                 REAL DEFAULT 0,
     depth_cm            REAL DEFAULT 0,
     cluster_size        INTEGER DEFAULT 1,
     source_device       VARCHAR(100) REFERENCES devices(id),
     telemetry_id        INTEGER,
-    status              VARCHAR(30) DEFAULT 'reported',           -- reported | verified | in_progress | repaired
+    status              VARCHAR(30) DEFAULT 'reported',
     assigned_contractor VARCHAR(100) DEFAULT NULL,
     confirmed           INTEGER DEFAULT 0,
     false_positive      INTEGER DEFAULT 0,
@@ -67,7 +58,6 @@ CREATE TABLE IF NOT EXISTS potholes (
     updated_at          TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 5. Road Segment Health Analysis Cache
 CREATE TABLE IF NOT EXISTS road_segments (
     id                  SERIAL PRIMARY KEY,
     route_id            VARCHAR(100) NOT NULL,
@@ -83,7 +73,6 @@ CREATE TABLE IF NOT EXISTS road_segments (
     analyzed_at         TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 6. High-Performance Spatial & Temporal Indexes
 CREATE INDEX IF NOT EXISTS idx_telemetry_geom      ON telemetry USING GIST (geom);
 CREATE INDEX IF NOT EXISTS idx_potholes_geom       ON potholes USING GIST (geom);
 CREATE INDEX IF NOT EXISTS idx_telemetry_device    ON telemetry(device_id);
@@ -92,7 +81,6 @@ CREATE INDEX IF NOT EXISTS idx_potholes_severity   ON potholes(severity);
 CREATE INDEX IF NOT EXISTS idx_potholes_status     ON potholes(status);
 CREATE INDEX IF NOT EXISTS idx_segments_route      ON road_segments(route_id);
 
--- 7. Seed Initial Telangana Patrol Fleet if Empty
 INSERT INTO devices (id, bike_plate, bike_model, rider_name, location, battery_pct, battery_voltage, battery_status, firmware, status, accel_sensor, gps_sensor, network_info, sd_storage, last_anomaly)
 VALUES 
     ('ESP32-NODE-TS09-EA-4412', 'TS 09 EA 4412', 'Royal Enfield Hunter 350', 'Patrol Unit 1 (R. Naresh)', 'Hitec City - Madhapur Sector', 94, 4.18, 'Good', 'v2.4.2-Release', 'Active', 'MPU6050 6-DoF (100 Hz)', 'NEO-6M GPS (3D Fix)', '4G LTE SIM7600', 'SanDisk 32GB', 'Nominal (No Hazards Detected)'),

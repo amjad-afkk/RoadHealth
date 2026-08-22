@@ -1549,9 +1549,7 @@ html, body {
     }
 }
 
-/* ============================================================
-   14. Route Roughness Profile & Elevation Drawer
-   ============================================================ */
+
 .route-roughness-drawer {
     position: absolute;
     bottom: 24px;
@@ -1645,9 +1643,7 @@ html, body {
     border-color: var(--apple-blue);
 }
 
-/* ============================================================
-   15. Export Modal & Pothole Actions
-   ============================================================ */
+
 .dropdown-header {
     font-size: 0.7rem;
     font-weight: 700;
@@ -1732,7 +1728,7 @@ html, body {
     color: #334155;
 }
 
-/* Vehicle Radar Pulse */
+
 .custom-bike-vehicle-marker {
     position: relative;
     display: flex;

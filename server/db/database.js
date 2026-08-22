@@ -1,10 +1,3 @@
-/**
- * RoadHealth — Unified Database Manager (PostgreSQL + PostGIS & SQLite Fallback)
- * 
- * Automatically connects to Supabase / PostgreSQL with PostGIS when DATABASE_URL is set,
- * and seamlessly provides SQLite WAL mode fallback if no PostgreSQL is configured.
- */
-
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
@@ -12,12 +5,9 @@ const Database = require('better-sqlite3');
 
 let pgPool = null;
 let sqliteDb = null;
-let dbType = 'sqlite'; // 'postgis' | 'sqlite'
+let dbType = 'sqlite';
 let postgisVersion = null;
 
-/**
- * Initialize database connection
- */
 async function init(dbPath) {
     const databaseUrl = process.env.DATABASE_URL;
 
@@ -32,16 +22,13 @@ async function init(dbPath) {
                 connectionTimeoutMillis: 10000
             });
 
-            // Test connection
             const client = await pgPool.connect();
             try {
-                // Check PostGIS
                 await client.query('CREATE EXTENSION IF NOT EXISTS postgis;');
                 const extCheck = await client.query('SELECT postgis_version();');
                 postgisVersion = extCheck.rows[0]?.postgis_version || 'PostGIS Active';
                 console.log(`[DB] ✅ Connected to Supabase PostgreSQL with PostGIS (${postgisVersion})`);
 
-                // Run PostGIS schema
                 const schemaPath = path.join(__dirname, 'postgisSchema.sql');
                 if (fs.existsSync(schemaPath)) {
                     const schemaSql = fs.readFileSync(schemaPath, 'utf-8');
@@ -61,14 +48,10 @@ async function init(dbPath) {
         }
     }
 
-    // Fallback to SQLite
     initSQLite(dbPath);
     return { type: 'sqlite', version: 'SQLite WAL Mode' };
 }
 
-/**
- * Initialize local SQLite fallback
- */
 function initSQLite(dbPath) {
     const resolvedPath = path.resolve(dbPath || './db/roadhealth.db');
     const dbDir = path.dirname(resolvedPath);
@@ -92,16 +75,10 @@ function initSQLite(dbPath) {
     return sqliteDb;
 }
 
-/**
- * Check if PostGIS is the active database engine
- */
 function isPostGIS() {
     return dbType === 'postgis';
 }
 
-/**
- * Get PostGIS version string or engine status
- */
 function getEngineInfo() {
     return {
         type: dbType,
@@ -110,17 +87,12 @@ function getEngineInfo() {
     };
 }
 
-/**
- * Execute a SQL query across either PostgreSQL or SQLite
- */
 async function query(sql, params = []) {
     if (dbType === 'postgis' && pgPool) {
-        // Convert named parameters or $1, $2 for Postgres
         const res = await pgPool.query(sql, params);
         return res.rows;
     } else {
         if (!sqliteDb) throw new Error('[DB] SQLite database not initialized.');
-        // SQLite query
         const stmt = sqliteDb.prepare(sql);
         if (sql.trim().toUpperCase().startsWith('SELECT')) {
             return Array.isArray(params) ? stmt.all(...params) : stmt.all(params);
@@ -131,12 +103,8 @@ async function query(sql, params = []) {
     }
 }
 
-/**
- * Synchronous SQLite handle for backward-compatibility if needed
- */
 function getDb() {
     if (sqliteDb) return sqliteDb;
-    // If running in PostGIS mode without sqliteDb, return a simulated interface or throw
     return {
         isPostGIS: true,
         prepare: () => {
@@ -145,9 +113,6 @@ function getDb() {
     };
 }
 
-/**
- * Get raw PostgreSQL pool
- */
 function getPool() {
     return pgPool;
 }

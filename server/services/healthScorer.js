@@ -1,22 +1,8 @@
-/**
- * RoadHealth — Road Health Scorer Service (PostGIS & Spatial Analysis)
- * 
- * Given a route polyline, cross-references stored telemetry and pothole data
- * to compute real health scores per segment.
- */
-
 const { isPostGIS, getPool, getDb } = require('../db/database');
 const { haversineDistance } = require('./detectionEngine');
 
-// Buffer distance around route to query telemetry (meters)
 const CORRIDOR_BUFFER_M = 30;
 
-/**
- * Analyze a route's road health using stored telemetry and pothole data
- * 
- * @param {Array} segments - Array of route segments, each with coords: [[lat, lng], ...]
- * @returns {Promise<Object>} - Analyzed route with real data
- */
 async function analyzeRouteHealth(segments) {
     const analyzedSegments = [];
 
@@ -34,14 +20,12 @@ async function analyzeRouteHealth(segments) {
             continue;
         }
 
-        // Calculate segment length
         let segLengthM = 0;
         for (let j = 0; j < coords.length - 1; j++) {
             segLengthM += haversineDistance(coords[j][0], coords[j][1], coords[j + 1][0], coords[j + 1][1]);
         }
         totalLengthM += segLengthM;
 
-        // Get bounding box of this segment
         const lats = coords.map(c => c[0]);
         const lngs = coords.map(c => c[1]);
         const minLat = Math.min(...lats);
@@ -49,7 +33,6 @@ async function analyzeRouteHealth(segments) {
         const minLng = Math.min(...lngs);
         const maxLng = Math.max(...lngs);
 
-        // Expand bounding box by corridor buffer
         const latBuffer = CORRIDOR_BUFFER_M / 111320;
         const lngBuffer = CORRIDOR_BUFFER_M / (111320 * Math.cos(((minLat + maxLat) / 2) * Math.PI / 180));
 
@@ -112,7 +95,6 @@ async function analyzeRouteHealth(segments) {
             });
         }
 
-        // Determine health from stored data
         const avgIri = telemetryData ? (parseFloat(telemetryData.avg_iri) || 0) : 0;
         const avgVib = telemetryData ? (parseFloat(telemetryData.avg_vib) || 0) : 0;
         const potholeCount = potholeData ? (parseInt(potholeData.pothole_count) || 0) : 0;
@@ -158,13 +140,11 @@ async function analyzeRouteHealth(segments) {
         });
     }
 
-    // Calculate exact length-weighted ratios
     const validTotal = totalLengthM > 0 ? totalLengthM : 1;
     let greenRatio = Math.round((greenLengthM / validTotal) * 100);
     let yellowRatio = Math.round((yellowLengthM / validTotal) * 100);
     let redRatio = Math.round((redLengthM / validTotal) * 100);
 
-    // Normalize to 100%
     const sum = greenRatio + yellowRatio + redRatio;
     if (sum !== 100 && sum > 0) {
         const diff = 100 - sum;
@@ -173,7 +153,6 @@ async function analyzeRouteHealth(segments) {
         else redRatio += diff;
     }
 
-    // Composite Road Health Score
     const avgIriOverall = weightedIriSum / validTotal;
     const avgVibOverall = weightedVibSum / validTotal;
     const iriPenalty = Math.min(45, (avgIriOverall / 7.0) * 45);
@@ -197,9 +176,6 @@ async function analyzeRouteHealth(segments) {
     };
 }
 
-/**
- * Get summary statistics for the database
- */
 async function getDatabaseStats() {
     if (isPostGIS()) {
         const pool = getPool();

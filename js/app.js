@@ -1,8 +1,3 @@
-/**
- * RoadHealth — Real-Time Event & GIS Controller
- * PostGIS Data Synchronization, Voice Proximity Alerts, Heatmap & Surface Visualizers.
- */
-
 const AppState = {
     alternativeRoutes: [],
     selectedRouteIndex: 0,
@@ -53,9 +48,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     connectWebSocket();
 });
 
-/**
- * Load Pre-Configured Telangana Route
- */
 async function loadPresetRoute(presetKey) {
     const preset = TELANGANA_PRESETS[presetKey];
     if (!preset) return;
@@ -75,9 +67,6 @@ async function loadPresetRoute(presetKey) {
     await calculateAndRenderLiveRoutes(preset.origin, preset.dest);
 }
 
-/**
- * Handle Search button click
- */
 async function handleCustomRouteSearch() {
     const inOrigin = document.getElementById('inputOrigin').value.trim();
     const inDest = document.getElementById('inputDest').value.trim();
@@ -118,9 +107,6 @@ async function handleCustomRouteSearch() {
     }
 }
 
-/**
- * Calculate and render routes with PostGIS corridor analysis
- */
 async function calculateAndRenderLiveRoutes(origin, dest) {
     const rawRoutesList = await window.roadHealthAPI.calculateMultipleRoutesBetween(origin, dest, origin.name, dest.name);
 
@@ -153,7 +139,6 @@ async function calculateAndRenderLiveRoutes(origin, dest) {
         }
     }
 
-    // Sort routes by Health Score (safest route first)
     analyzedList.sort((a, b) => b.compositeScore - a.compositeScore);
 
     AppState.alternativeRoutes = analyzedList;
@@ -168,9 +153,6 @@ async function calculateAndRenderLiveRoutes(origin, dest) {
     drawRouteProfileChart(AppState.selectedAnalyzedRoute);
 }
 
-/**
- * Switch Selected Alternative Route
- */
 function selectAlternativeRoute(index) {
     if (index < 0 || index >= AppState.alternativeRoutes.length) return;
 
@@ -184,9 +166,6 @@ function selectAlternativeRoute(index) {
 }
 window.selectAlternativeRoute = selectAlternativeRoute;
 
-/**
- * Render Route Cards
- */
 function renderAlternativeRouteCards(routes, selectedIndex = 0) {
     const listEl = document.getElementById('routeCardList');
     const headerEl = document.getElementById('altRouteHeader');
@@ -238,9 +217,6 @@ function renderAlternativeRouteCards(routes, selectedIndex = 0) {
     if (window.lucide) lucide.createIcons();
 }
 
-/**
- * Update Top-Right Floating Summary Card
- */
 function updateFloatingSummaryCard(analyzed) {
     if (!analyzed) return;
 
@@ -275,14 +251,10 @@ function updateFloatingSummaryCard(analyzed) {
     if (legRed) legRed.innerText = `Potholes: ${analyzed.ratios.red}%`;
 }
 
-/**
- * Voice Proximity Hazard Alerts using Web Speech API
- */
 function speakHazardWarning(text) {
     if (!AppState.voiceAlertsEnabled || !('speechSynthesis' in window)) return;
 
     const now = Date.now();
-    // Throttle voice callouts to once every 5 seconds
     if (now - AppState.lastSpokenPotholeTime < 5000) return;
     AppState.lastSpokenPotholeTime = now;
 
@@ -312,9 +284,6 @@ function toggleVoiceAlerts() {
     }
 }
 
-/**
- * Toggle Road Damage Heatmap Layer
- */
 async function toggleHeatmapLayer() {
     AppState.showHeatmap = !AppState.showHeatmap;
     const btn = document.getElementById('tab-heatmap');
@@ -328,9 +297,6 @@ async function toggleHeatmapLayer() {
     }
 }
 
-/**
- * Toggle Route Roughness Profile Drawer & Draw Chart
- */
 function toggleRoughnessProfileDrawer() {
     const drawer = document.getElementById('roughnessProfileDrawer');
     if (!drawer) return;
@@ -365,7 +331,6 @@ function drawRouteProfileChart(route) {
     ctx.fillStyle = '#0F172A';
     ctx.fillRect(0, 0, w, h);
 
-    // Draw baseline threshold line (IRI 4.5 critical)
     const critY = h * 0.35;
     ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
     ctx.lineWidth = 1;
@@ -376,7 +341,6 @@ function drawRouteProfileChart(route) {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw segment roughness cross-section bars
     const segs = route.segments;
     const segWidth = w / (segs.length || 1);
 
@@ -388,7 +352,6 @@ function drawRouteProfileChart(route) {
 
         const color = seg.health === 'bad' ? '#EF4444' : (seg.health === 'moderate' ? '#F59E0B' : '#10B981');
 
-        // Gradient bar
         const grad = ctx.createLinearGradient(0, y, 0, h);
         grad.addColorStop(0, color);
         grad.addColorStop(1, 'rgba(15, 23, 42, 0.8)');
@@ -396,15 +359,11 @@ function drawRouteProfileChart(route) {
         ctx.fillStyle = grad;
         ctx.fillRect(x + 2, y, segWidth - 4, normalizedH);
 
-        // Top line
         ctx.fillStyle = color;
         ctx.fillRect(x + 2, y, segWidth - 4, 3);
     });
 }
 
-/**
- * Pothole Status Actions
- */
 async function markPotholeRepaired(id) {
     const res = await window.roadHealthAPI.updatePotholeStatus(id, 'repaired', 'GHMC Road Maintenance Unit');
     if (res && res.success) {
@@ -423,9 +382,6 @@ async function flagPotholeFalsePositive(id) {
 }
 window.flagPotholeFalsePositive = flagPotholeFalsePositive;
 
-/**
- * Virtual Patrol Bike Simulation Trigger
- */
 async function startVirtualBikeSimulation() {
     const route = AppState.selectedAnalyzedRoute;
     let coords = null;
@@ -445,9 +401,6 @@ async function startVirtualBikeSimulation() {
     }
 }
 
-/**
- * Municipal Report Export Modal Handlers
- */
 function openExportModal() {
     const container = document.getElementById('settingsMenuContainer');
     if (container) container.classList.remove('open');
@@ -468,9 +421,6 @@ function downloadExport(format) {
     closeExportModal();
 }
 
-/**
- * WebSocket Connection & Live Event Stream
- */
 let wsConnection = null;
 
 function connectWebSocket() {
@@ -607,9 +557,6 @@ function startWaveformAnimation() {
     requestAnimationFrame(draw);
 }
 
-/**
- * Autocomplete Listeners with Photon Fast Search
- */
 let originDebounceTimer = null;
 let destDebounceTimer = null;
 
@@ -634,7 +581,7 @@ function setupAutocompleteListeners() {
                     AppState.originPoint = { name: inOrigin.value, lat: selected.lat, lng: selected.lng };
                     dropOrigin.classList.remove('open');
                 });
-            }, 180); // Fast 180ms debounce with Photon
+            }, 180);
         });
     }
 
@@ -686,9 +633,6 @@ function renderAutocompleteDropdown(dropdownEl, items, onSelect) {
     if (window.lucide) lucide.createIcons();
 }
 
-/**
- * Swapping & UI Utility Functions
- */
 function swapOriginDestination() {
     const inOrigin = document.getElementById('inputOrigin');
     const inDest = document.getElementById('inputDest');
@@ -740,7 +684,6 @@ function toggleMapTheme(type) {
     window.roadHealthMap.setBasemap(type);
     document.getElementById('settingsMenuContainer')?.classList.remove('open');
 
-    // Update active badge
     document.querySelectorAll('.dropdown-item .item-badge').forEach(b => b.remove());
 }
 

@@ -1,69 +1,29 @@
-/**
- * RoadHealth — Pothole & Crack Detection Engine (PostGIS & Spatial Optimized)
- * 
- * Analyzes raw accelerometer telemetry from ESP32 MPU6050 sensors
- * to detect potholes, cracks, and road surface anomalies.
- * 
- * Detection Methods:
- * 1. Z-axis spike detection (sudden vertical acceleration = pothole impact)
- * 2. IRI estimation from running RMS of vibration data
- * 3. Spatial deduplication (native PostGIS ST_DWithin or Haversine fallback)
- */
-
 const { isPostGIS, getPool, getDb } = require('../db/database');
 
-// Detection thresholds (tunable via Admin Dashboard)
 const CONFIG = {
-    // Z-axis acceleration spike threshold in G-force
-    // Normal riding: ~1G (9.81 m/s²), Pothole impact: 3-8G spike
     Z_SPIKE_THRESHOLD_G: 4.2,
-
-    // IRI threshold for "critical" classification (m/km)
     IRI_CRITICAL_THRESHOLD: 4.5,
-
-    // IRI threshold for "moderate" classification (m/km)
     IRI_MODERATE_THRESHOLD: 2.5,
-
-    // Spatial deduplication radius in meters
-    // Detections within this radius of an existing pothole update it instead of creating new
     DEDUP_RADIUS_M: 10,
-
-    // Gravity constant (m/s²)
     GRAVITY: 9.81,
-
-    // RMS window size for IRI estimation (number of samples)
     RMS_WINDOW: 50,
-
-    // Empirical multiplier: RMS vibration → IRI estimate
     RMS_TO_IRI_FACTOR: 2.8
 };
 
-/**
- * Process a single telemetry reading and detect anomalies
- * 
- * @param {Object} telemetryRow - The telemetry record just inserted
- * @returns {Promise<Object|null>} - Detected pothole or null if road is normal
- */
 async function analyzeTelemetry(telemetryRow) {
     const { id, device_id, lat, lng, accel_z, iri_estimate, vibration_mag } = telemetryRow;
 
-    // Calculate G-force deviation from gravity
     const zDeviation = Math.abs((accel_z || CONFIG.GRAVITY) - CONFIG.GRAVITY);
     const gForce = zDeviation / CONFIG.GRAVITY;
 
-    // Method 1: Z-axis spike detection
     const isSpikeDetected = gForce >= (CONFIG.Z_SPIKE_THRESHOLD_G - 1);
-
-    // Method 2: IRI-based classification
     const iriValue = iri_estimate || estimateIRI(vibration_mag);
     const isHighIRI = iriValue >= CONFIG.IRI_MODERATE_THRESHOLD;
 
-    // Combined trigger: spike OR high IRI with significant vibration
     if (!isSpikeDetected && !isHighIRI) {
-        return null; // Road surface is normal
+        return null;
     }
 
-    // Classify severity
     let severity = 'moderate';
     let estimatedDepth = 0;
 
@@ -74,7 +34,6 @@ async function analyzeTelemetry(telemetryRow) {
         estimatedDepth = Math.round(gForce * 1.2 * 10) / 10;
     }
 
-    // Method 3: Spatial deduplication — check for nearby existing potholes
     const existing = await findNearbyPothole(lat, lng, CONFIG.DEDUP_RADIUS_M);
 
     if (isPostGIS()) {
@@ -127,7 +86,6 @@ async function analyzeTelemetry(telemetryRow) {
             };
         }
     } else {
-        // SQLite fallback
         const db = getDb();
         if (existing) {
             db.prepare(`
@@ -189,19 +147,11 @@ async function analyzeTelemetry(telemetryRow) {
     }
 }
 
-/**
- * Estimate IRI from vibration magnitude
- */
 function estimateIRI(vibrationMag) {
     if (!vibrationMag || vibrationMag <= 0) return 0;
     return +(vibrationMag * CONFIG.RMS_TO_IRI_FACTOR).toFixed(2);
 }
 
-/**
- * Find an existing pothole within the deduplication radius
- * In PostGIS: Uses native ST_DWithin with GiST index
- * In SQLite: Uses bounding box + Haversine fallback
- */
 async function findNearbyPothole(lat, lng, radiusM) {
     if (isPostGIS()) {
         const pool = getPool();
@@ -249,9 +199,6 @@ async function findNearbyPothole(lat, lng, radiusM) {
     }
 }
 
-/**
- * Haversine distance between two coordinates in meters
- */
 function haversineDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI / 180;
@@ -267,9 +214,6 @@ function haversineDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-/**
- * Update detection thresholds
- */
 function updateThresholds(newConfig) {
     if (newConfig.zSpikeThreshold !== undefined) {
         CONFIG.Z_SPIKE_THRESHOLD_G = newConfig.zSpikeThreshold;
@@ -286,9 +230,6 @@ function updateThresholds(newConfig) {
     console.log('[DetectionEngine] Thresholds updated:', CONFIG);
 }
 
-/**
- * Get current detection configuration
- */
 function getConfig() {
     return { ...CONFIG };
 }
