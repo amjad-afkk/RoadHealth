@@ -1,21 +1,19 @@
 /**
- * RoadHealth — Routes Analysis API
- * Analyze road health for route segments using stored telemetry data
+ * RoadHealth — Routes Analysis API (PostGIS & Spatial Intelligence)
+ * Analyze road health for route segments using stored telemetry and PostGIS
  */
 
 const express = require('express');
 const router = express.Router();
 const { analyzeRouteHealth, getDatabaseStats } = require('../services/healthScorer');
 const { getConfig, updateThresholds } = require('../services/detectionEngine');
+const { getEngineInfo } = require('../db/database');
 
 /**
  * POST /api/v1/routes/analyze
  * Analyze a route's segments against stored telemetry and pothole data
- * 
- * Body: { segments: [ { coords: [[lat, lng], ...], roadName: "..." }, ... ] }
- * Returns: health analysis with real data overlay
  */
-router.post('/analyze', (req, res) => {
+router.post('/analyze', async (req, res) => {
     try {
         const { segments } = req.body;
 
@@ -26,7 +24,7 @@ router.post('/analyze', (req, res) => {
             });
         }
 
-        const analysis = analyzeRouteHealth(segments);
+        const analysis = await analyzeRouteHealth(segments);
 
         res.json({
             success: true,
@@ -41,18 +39,20 @@ router.post('/analyze', (req, res) => {
 
 /**
  * GET /api/v1/routes/stats
- * Get database-wide statistics (replaces the mock "PostGIS sync" response)
+ * Get database-wide statistics and PostGIS engine information
  */
-router.get('/stats', (req, res) => {
+router.get('/stats', async (req, res) => {
     try {
-        const stats = getDatabaseStats();
+        const stats = await getDatabaseStats();
         const config = getConfig();
+        const engineInfo = getEngineInfo();
 
         res.json({
             success: true,
             syncedAt: new Date().toISOString(),
-            engine: 'SQLite WAL Mode (PostGIS-ready schema)',
-            version: 'RoadHealth DB v1.0',
+            engine: engineInfo.version,
+            databaseType: engineInfo.type,
+            isSpatialPostGIS: engineInfo.isSpatial,
             stats,
             detectionConfig: config
         });

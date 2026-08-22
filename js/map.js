@@ -1,4 +1,7 @@
-
+/**
+ * RoadHealth — Multi-Basemap GIS Engine (Leaflet + Heatmap + PostGIS Layers)
+ * Supports Google Hybrid Satellite, Esri World Imagery, CartoDB Light & Dark Matter.
+ */
 
 class RoadHealthMap {
     constructor(containerId = 'map') {
@@ -7,12 +10,14 @@ class RoadHealthMap {
         this.allRoutes = [];
         this.selectedIndex = 0;
         this.selectedRoute = null;
-        this.currentBasemapType = 'satellite';
+        this.currentBasemapType = 'google-satellite';
 
         // Tile layer references
         this.tileLayers = {
-            satellite: null,
-            street: null
+            'google-satellite': null,
+            'esri-satellite': null,
+            'street': null,
+            'dark': null
         };
 
         // Layer groups
@@ -22,19 +27,21 @@ class RoadHealthMap {
             routeGroup: L.layerGroup(),
             crackOverlayGroup: L.layerGroup(),
             potholeMarkerGroup: L.layerGroup(),
+            heatmapLayer: null,
             poiMarkerGroup: L.layerGroup(),
             vehicleGroup: L.layerGroup()
         };
 
         this.activeRedSegments = [];
         this.isCrackLayerActive = false;
+        this.isHeatmapActive = false;
         this.vehicleMarker = null;
 
         this.initMap();
     }
 
     /**
-     * Initialize Leaflet map centered on Telangana (Hyderabad) with High-Res Satellite
+     * Initialize Leaflet map centered on Telangana (Hyderabad)
      */
     initMap() {
         this.map = L.map(this.containerId, {
@@ -44,28 +51,43 @@ class RoadHealthMap {
             attributionControl: false
         });
 
-        // 1. High-Res Google Hybrid Satellite (Photorealistic imagery + crisp place labels with 100% India coverage up to zoom 22)
-        this.tileLayers.satellite = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+        // 1. Google Hybrid Satellite
+        this.tileLayers['google-satellite'] = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             subdomains: ['0', '1', '2', '3'],
             maxZoom: 22,
             maxNativeZoom: 19,
             attribution: '&copy; Google Maps Satellite'
         });
 
-        // 2. CartoDB Positron Light Street Map Tiles (up to zoom 20 with stretching)
-        this.tileLayers.street = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        // 2. Esri World Imagery (High-Res 100% Free Satellite)
+        this.tileLayers['esri-satellite'] = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 22,
+            maxNativeZoom: 18,
+            attribution: '&copy; Esri World Imagery'
+        });
+
+        // 3. CartoDB Positron Light
+        this.tileLayers['street'] = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             subdomains: 'abcd',
             maxZoom: 22,
-            maxNativeZoom: 19
+            maxNativeZoom: 19,
+            attribution: '&copy; CartoDB Positron'
+        });
+
+        // 4. CartoDB Dark Matter
+        this.tileLayers['dark'] = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 22,
+            maxNativeZoom: 19,
+            attribution: '&copy; CartoDB Dark Matter'
         });
 
         // Set default basemap
-        this.tileLayers.satellite.addTo(this.map);
+        this.tileLayers['google-satellite'].addTo(this.map);
 
         // Attribution in bottom right
         L.control.attribution({ position: 'bottomright', prefix: false })
-            .addAttribution('RoadHealth &bull; High-Res Satellite AI')
+            .addAttribution('RoadHealth &bull; PostGIS Spatial Engine')
             .addTo(this.map);
 
         // Add feature layer groups in z-order
@@ -85,23 +107,55 @@ class RoadHealthMap {
             }
         });
 
-        console.log('[RoadHealth Map] Initialized with Google Hybrid Satellite (Telangana, India).');
+        console.log('[RoadHealth Map] Initialized with Multi-Basemaps & PostGIS.');
     }
 
     /**
-     * Switch Basemap Layer ('satellite' | 'street')
+     * Switch Basemap Layer ('google-satellite' | 'esri-satellite' | 'street' | 'dark')
      */
     setBasemap(type) {
+        if (!this.tileLayers[type]) type = 'google-satellite';
         this.currentBasemapType = type;
 
-        if (type === 'satellite') {
-            if (this.map.hasLayer(this.tileLayers.street)) this.map.removeLayer(this.tileLayers.street);
-            if (!this.map.hasLayer(this.tileLayers.satellite)) this.tileLayers.satellite.addTo(this.map);
-        } else {
-            if (this.map.hasLayer(this.tileLayers.satellite)) this.map.removeLayer(this.tileLayers.satellite);
-            if (!this.map.hasLayer(this.tileLayers.street)) this.tileLayers.street.addTo(this.map);
-        }
+        Object.keys(this.tileLayers).forEach(key => {
+            const layer = this.tileLayers[key];
+            if (layer && this.map.hasLayer(layer)) {
+                this.map.removeLayer(layer);
+            }
+        });
+
+        this.tileLayers[type].addTo(this.map);
         console.log(`[RoadHealth Map] Basemap switched to: ${type}`);
+    }
+
+    /**
+     * Render Dynamic Road Roughness Heatmap Layer
+     */
+    renderHeatmap(points, isVisible = true) {
+        this.isHeatmapActive = isVisible;
+
+        if (this.layers.heatmapLayer && this.map.hasLayer(this.layers.heatmapLayer)) {
+            this.map.removeLayer(this.layers.heatmapLayer);
+            this.layers.heatmapLayer = null;
+        }
+
+        if (!isVisible || !points || points.length === 0) return;
+
+        if (typeof L.heatLayer === 'function') {
+            this.layers.heatmapLayer = L.heatLayer(points, {
+                radius: 28,
+                blur: 18,
+                maxZoom: 17,
+                max: 1.0,
+                gradient: {
+                    0.2: '#10B981', // Green
+                    0.5: '#F59E0B', // Amber
+                    0.8: '#EF4444', // Red
+                    1.0: '#991B1B'  // Dark Red
+                }
+            });
+            this.layers.heatmapLayer.addTo(this.map);
+        }
     }
 
     /**
@@ -113,386 +167,319 @@ class RoadHealthMap {
         this.selectedRoute = routesList[selectedIndex] || routesList[0];
         this.activeRedSegments = [];
 
-        // Clear all layers
+        // Clear layers
         this.layers.altRoutesGroup.clearLayers();
         this.layers.casingGroup.clearLayers();
         this.layers.routeGroup.clearLayers();
         this.layers.crackOverlayGroup.clearLayers();
-        this.layers.poiMarkerGroup.clearLayers();
-        this.isCrackLayerActive = false;
 
         if (!routesList || routesList.length === 0) return;
 
-        const allLatLngs = [];
+        // 1. Render Unselected (Alternative) Routes in muted semi-transparent gray
+        routesList.forEach((route, idx) => {
+            if (idx === selectedIndex) return;
 
-        // 1. Render Inactive Alternative Routes (subtle, semi-transparent & clickable to select)
-        routesList.forEach((r, idx) => {
-            if (idx !== selectedIndex) {
-                const altCoords = r.segments.flatMap(s => s.coords);
-                
-                // Inactive route casing
-                const altCasing = L.polyline(altCoords, {
-                    color: '#000000',
-                    weight: 8,
-                    opacity: 0.35,
-                    lineCap: 'round',
-                    lineJoin: 'round'
-                });
+            const fullPolyline = [];
+            (route.segments || []).forEach(seg => {
+                if (seg.coords && seg.coords.length > 0) {
+                    fullPolyline.push(...seg.coords);
+                }
+            });
 
-                // Inactive route polyline
-                const altPoly = L.polyline(altCoords, {
+            if (fullPolyline.length >= 2) {
+                const altLine = L.polyline(fullPolyline, {
                     color: '#94A3B8',
-                    weight: 5,
-                    opacity: 0.75,
-                    dashArray: '6, 6',
+                    weight: 6,
+                    opacity: 0.55,
                     lineCap: 'round',
                     lineJoin: 'round'
                 });
 
-                altPoly.bindTooltip(`
-                    <div class="apple-map-tooltip">
-                        <strong>${r.name}</strong>
-                        <div>${r.etaFormatted} • ${r.totalDistanceKm} km</div>
-                        <div style="color: #60A5FA; font-weight: 700; margin-top: 2px;">Click to switch to this route</div>
-                    </div>
-                `, { className: 'apple-tooltip-wrap' });
-
-                // Click on alternate line switches active route
-                const handleAltClick = () => {
-                    if (window.selectAlternativeRoute) {
+                altLine.on('click', () => {
+                    if (typeof window.selectAlternativeRoute === 'function') {
                         window.selectAlternativeRoute(idx);
                     }
-                };
-                altPoly.on('click', handleAltClick);
-                altCasing.on('click', handleAltClick);
+                });
 
-                this.layers.altRoutesGroup.addLayer(altCasing);
-                this.layers.altRoutesGroup.addLayer(altPoly);
+                altLine.bindTooltip(`<strong>Option ${idx + 1}</strong> (${route.name})<br>${route.totalDistanceKm} km &bull; ${route.compositeScore}% Health`, {
+                    sticky: true,
+                    className: 'route-alt-tooltip'
+                });
+
+                this.layers.altRoutesGroup.addLayer(altLine);
             }
         });
 
-        // 2. Render Active Selected Route in full vivid health colors
-        const activeRoute = this.selectedRoute;
-        activeRoute.segments.forEach((seg) => {
-            const coords = seg.coords;
-            coords.forEach(pt => allLatLngs.push(pt));
+        // 2. Render Selected Primary Route with segment color-coding
+        const primaryRoute = this.selectedRoute;
+        if (!primaryRoute || !primaryRoute.segments) return;
 
+        const allSelectedCoords = [];
+
+        primaryRoute.segments.forEach((seg, sIdx) => {
+            if (!seg.coords || seg.coords.length < 2) return;
+            allSelectedCoords.push(...seg.coords);
+
+            const color = seg.health === 'bad' ? '#EF4444' : (seg.health === 'moderate' ? '#F59E0B' : '#10B981');
             const isRed = seg.health === 'bad';
+
             if (isRed) {
                 this.activeRedSegments.push(seg);
             }
 
-            // Outer glow / casing polyline
-            const casingPolyline = L.polyline(coords, {
-                color: '#ffffff',
-                weight: 11,
+            // Outer crisp white casing
+            const casing = L.polyline(seg.coords, {
+                color: '#FFFFFF',
+                weight: 10,
                 opacity: 0.95,
                 lineCap: 'round',
-                lineJoin: 'round',
-                className: 'route-casing-glow'
+                lineJoin: 'round'
             });
-            this.layers.casingGroup.addLayer(casingPolyline);
+            this.layers.casingGroup.addLayer(casing);
 
-            // Subtle drop shadow casing
-            const shadowPolyline = L.polyline(coords, {
-                color: 'rgba(0, 0, 0, 0.45)',
-                weight: 15,
-                opacity: 0.65,
-                lineCap: 'round',
-                lineJoin: 'round',
-                className: 'route-casing-shadow'
-            });
-            this.layers.casingGroup.addLayer(shadowPolyline);
-
-            // Inner vivid health-colored polyline
-            const color = seg.color || window.roadHealthEngine.getHealthColor(seg.health);
-            const innerPolyline = L.polyline(coords, {
+            // Core health colored polyline
+            const coreLine = L.polyline(seg.coords, {
                 color: color,
-                weight: 6.5,
-                opacity: 0.98,
+                weight: 6,
+                opacity: 1.0,
                 lineCap: 'round',
-                lineJoin: 'round',
-                className: `route-segment-poly route-${seg.health}`
+                lineJoin: 'round'
             });
 
-            innerPolyline.on('mouseover', (e) => {
-                casingPolyline.setStyle({ weight: 14, opacity: 1 });
-                innerPolyline.setStyle({ weight: 8.5 });
-                if (window.onSegmentHover) {
-                    window.onSegmentHover(seg, e);
+            coreLine.on('click', () => {
+                if (typeof window.onSegmentClick === 'function') {
+                    window.onSegmentClick(seg);
                 }
             });
 
-            innerPolyline.on('mouseout', () => {
-                casingPolyline.setStyle({ weight: 11, opacity: 0.95 });
-                innerPolyline.setStyle({ weight: 6.5 });
-                if (window.onSegmentLeave) {
-                    window.onSegmentLeave();
-                }
-            });
+            coreLine.bindTooltip(`
+                <div class="segment-tooltip-content">
+                    <strong>${seg.roadName || 'Road Segment'}</strong>
+                    <div style="color: ${color}; font-weight: 700; margin-top: 2px;">
+                        ${seg.health === 'bad' ? '⚠️ Degraded / Critical' : (seg.health === 'moderate' ? '⚡ Moderate Roughness' : '✅ Smooth Asphalt')}
+                    </div>
+                    <div style="font-size: 0.72rem; color: #64748B; margin-top: 2px;">
+                        IRI: ${seg.iri || '--'} m/km &bull; Potholes: ${seg.potholeCount || 0}
+                    </div>
+                </div>
+            `, { sticky: true });
 
-            innerPolyline.on('click', (e) => {
-                if (window.onSegmentClick) {
-                    window.onSegmentClick(seg, e);
-                }
-            });
-
-            this.layers.routeGroup.addLayer(innerPolyline);
+            this.layers.routeGroup.addLayer(coreLine);
         });
 
-        // 3. Render Origin & Destination POI markers
-        if (allLatLngs.length > 1) {
-            const startCoord = allLatLngs[0];
-            const endCoord = allLatLngs[allLatLngs.length - 1];
+        // 3. Render Origin & Destination POI Markers
+        this.renderOriginDestMarkers(primaryRoute);
 
-            // Origin Marker
-            const startIcon = L.divIcon({
-                className: 'custom-poi-marker',
-                html: `
-                    <div class="apple-marker origin-marker">
-                        <div class="marker-halo"></div>
-                        <div class="marker-core origin-core">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"/></svg>
-                        </div>
-                        <div class="marker-label">${activeRoute.originName || 'Start'}</div>
-                    </div>
-                `,
-                iconSize: [32, 32],
-                iconAnchor: [16, 16]
-            });
-            const startMarker = L.marker(startCoord, { icon: startIcon });
-            this.layers.poiMarkerGroup.addLayer(startMarker);
-
-            // Destination Marker
-            const destIcon = L.divIcon({
-                className: 'custom-poi-marker',
-                html: `
-                    <div class="apple-marker dest-marker">
-                        <div class="marker-core dest-core">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-                        </div>
-                        <div class="marker-label">${activeRoute.destName || 'Destination'}</div>
-                    </div>
-                `,
-                iconSize: [32, 32],
-                iconAnchor: [16, 16]
-            });
-            const destMarker = L.marker(endCoord, { icon: destIcon });
-            this.layers.poiMarkerGroup.addLayer(destMarker);
-
-            // Fit map bounds to entire active route
-            const polyBounds = L.latLngBounds(allLatLngs);
-            this.map.fitBounds(polyBounds, {
-                paddingTopLeft: [80, 80],
-                paddingBottomRight: [80, 160],
+        // 4. Fit Map Bounds
+        if (allSelectedCoords.length > 0) {
+            this.map.fitBounds(L.latLngBounds(allSelectedCoords), {
+                padding: [80, 80],
                 maxZoom: 16,
-                animate: true
+                animate: true,
+                duration: 0.8
             });
         }
 
-        // 4. Check for high-zoom crack overlays
+        // 5. Update Distress Overlays
         this.handleZoomChange();
     }
 
     /**
-     * High-Zoom Crack Overlays logic
+     * Render Origin and Destination Map Pins
      */
-    handleZoomChange() {
-        const currentZoom = this.map.getZoom();
-        if (currentZoom >= 16) {
-            this.updateCrackOverlays();
-        } else {
-            if (this.isCrackLayerActive || this.layers.crackOverlayGroup.getLayers().length > 0) {
-                this.layers.crackOverlayGroup.clearLayers();
-                this.isCrackLayerActive = false;
-            }
-        }
+    renderOriginDestMarkers(route) {
+        this.layers.poiMarkerGroup.clearLayers();
+        if (!route || !route.origin || !route.destination) return;
+
+        const originIcon = L.divIcon({
+            className: 'custom-poi-pin origin-pin',
+            html: `<div class="pin-pulse"></div><div class="pin-core green"></div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+
+        const destIcon = L.divIcon({
+            className: 'custom-poi-pin dest-pin',
+            html: `<div class="pin-pulse"></div><div class="pin-core red"><i data-lucide="flag" style="width:10px;height:10px;color:#fff;"></i></div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+
+        const originMarker = L.marker([route.origin.lat, route.origin.lng], { icon: originIcon })
+            .bindPopup(`<strong>Origin</strong><br>${route.origin.name || 'Start Point'}`);
+
+        const destMarker = L.marker([route.destination.lat, route.destination.lng], { icon: destIcon })
+            .bindPopup(`<strong>Destination</strong><br>${route.destination.name || 'End Point'}`);
+
+        this.layers.poiMarkerGroup.addLayer(originMarker);
+        this.layers.poiMarkerGroup.addLayer(destMarker);
     }
 
     /**
-     * Procedurally render realistic transparent SVG road crack overlays
+     * Render Detected Potholes with PostGIS Status Lifecycle
      */
-    updateCrackOverlays() {
-        this.layers.crackOverlayGroup.clearLayers();
-        if (this.activeRedSegments.length === 0) return;
-
-        const viewBounds = this.map.getBounds();
-        let renderedCount = 0;
-
-        this.activeRedSegments.forEach(seg => {
-            const segLatLngs = seg.coords.map(c => L.latLng(c[0], c[1]));
-            const segBounds = L.latLngBounds(segLatLngs);
-
-            if (!viewBounds.intersects(segBounds)) return;
-
-            for (let i = 0; i < seg.coords.length - 1; i++) {
-                const ptA = seg.coords[i];
-                const ptB = seg.coords[i + 1];
-
-                const legBounds = L.latLngBounds([ptA, ptB]);
-                const paddedBounds = legBounds.pad(0.08);
-
-                const svgCrackUrl = this._generateCrackSvgDataUrl(i, seg.potholeCount || 10);
-                const crackOverlay = L.imageOverlay(svgCrackUrl, paddedBounds, {
-                    opacity: 0.94,
-                    interactive: true,
-                    className: 'dynamic-road-crack-overlay'
-                });
-
-                crackOverlay.on('click', () => {
-                    if (window.onDistressZoneClick) {
-                        window.onDistressZoneClick(seg, ptA);
-                    }
-                });
-
-                this.layers.crackOverlayGroup.addLayer(crackOverlay);
-                renderedCount++;
-            }
-
-            // Pothole pulse markers
-            seg.coords.forEach((pt, pIdx) => {
-                if (pIdx % 2 === 1) {
-                    const potholeDistressIcon = L.divIcon({
-                        className: 'pothole-crack-pulse',
-                        html: `
-                            <div class="crack-hotspot">
-                                <div class="pulse-ring"></div>
-                                <div class="distress-icon">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="3">
-                                        <path d="M12 2L2 22h20L12 2z"/>
-                                    </svg>
-                                </div>
-                            </div>
-                        `,
-                        iconSize: [24, 24],
-                        iconAnchor: [12, 12]
-                    });
-                    const distressMarker = L.marker(pt, { icon: potholeDistressIcon });
-                    this.layers.crackOverlayGroup.addLayer(distressMarker);
-                }
-            });
-        });
-
-        this.isCrackLayerActive = renderedCount > 0;
-    }
-
-    _generateCrackSvgDataUrl(seed = 0, severity = 10) {
-        const svgContent = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200" width="100%" height="100%" preserveAspectRatio="none">
-            <defs>
-                <filter id="crackShadow" x="-20%" y="-20%" width="140%" height="140%">
-                    <feDropShadow dx="1" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.6"/>
-                </filter>
-            </defs>
-            <g filter="url(#crackShadow)">
-                <path d="M 15,95 Q 55,75 90,105 T 160,88 T 225,118 T 288,95" 
-                      fill="none" stroke="#151413" stroke-width="4.0" stroke-linecap="round" stroke-linejoin="bevel" />
-                
-                <path d="M 18,95 Q 56,78 90,105 T 160,89 T 225,118 T 285,95" 
-                      fill="none" stroke="#000000" stroke-width="2.2" stroke-linecap="round" />
-
-                <path d="M 90,105 L 118,145 M 90,105 L 72,138 M 160,88 L 178,48 M 160,88 L 138,42 M 225,118 L 250,155 M 225,118 L 212,170" 
-                      fill="none" stroke="#262321" stroke-width="2.0" stroke-linecap="round" />
-
-                <circle cx="160" cy="88" r="11" fill="rgba(15, 13, 12, 0.85)" stroke="#EF4444" stroke-width="1.8" />
-                <circle cx="158" cy="87" r="6.5" fill="#000000" />
-                <circle cx="90" cy="105" r="8" fill="rgba(15, 13, 12, 0.75)" stroke="#F59E0B" stroke-width="1.4" />
-                <circle cx="225" cy="118" r="7" fill="rgba(15, 13, 12, 0.75)" stroke="#EF4444" stroke-width="1.2" />
-            </g>
-        </svg>
-        `.trim();
-
-        return `data:image/svg+xml;utf8,${encodeURIComponent(svgContent)}`;
-    }
-
-    renderPotholes(potholesList, show = true) {
+    renderPotholes(potholesList, isVisible = true) {
         this.layers.potholeMarkerGroup.clearLayers();
-        if (!show || !potholesList) return;
+        if (!isVisible || !potholesList || potholesList.length === 0) return;
 
         potholesList.forEach(p => {
-            const isCritical = p.severity === 'critical' || p.iri > 4.5;
-            const markerIcon = L.divIcon({
-                className: 'pothole-telem-marker',
+            const isCrit = p.severity === 'critical';
+            const isRepaired = p.status === 'repaired';
+
+            const markerClass = isRepaired ? 'pothole-repaired' : (isCrit ? 'pothole-crit' : 'pothole-mod');
+            const color = isRepaired ? '#10B981' : (isCrit ? '#EF4444' : '#F59E0B');
+
+            const icon = L.divIcon({
+                className: 'custom-pothole-hazard-pin',
                 html: `
-                    <div class="pothole-badge-pin ${isCritical ? 'critical' : 'moderate'}">
-                        <div class="pin-dot"></div>
-                        <div class="pin-pulse"></div>
+                    <div class="pothole-pin-wrap ${markerClass}">
+                        <div class="pothole-pulse" style="border-color: ${color};"></div>
+                        <div class="pothole-core" style="background: ${color};">
+                            <span class="pothole-depth-label">${Math.round(p.depthCm || 5)}cm</span>
+                        </div>
                     </div>
                 `,
-                iconSize: [20, 20],
-                iconAnchor: [10, 10]
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
             });
 
-            const marker = L.marker([p.lat, p.lng], { icon: markerIcon });
-            marker.bindTooltip(`
-                <div class="apple-map-tooltip">
-                    <strong>${isCritical ? 'Critical Pothole' : 'Moderate Pothole'}</strong>
-                    <div class="tooltip-row"><span>IRI Index:</span> <b>${p.iri} m/km</b></div>
-                    <div class="tooltip-row"><span>Depth:</span> <b>${p.depthCm} cm</b></div>
-                </div>
-            `, { direction: 'top', offset: [0, -8], className: 'apple-tooltip-wrap' });
+            const statusBadge = isRepaired
+                ? '<span style="background: #ECFDF5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700;">✅ Repaired</span>'
+                : `<span style="background: ${isCrit ? '#FEF2F2' : '#FFFBEB'}; color: ${isCrit ? '#DC2626' : '#D97706'}; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700;">${p.status.toUpperCase()}</span>`;
 
+            const popupContent = `
+                <div class="pothole-popup-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.78rem; color: #64748B; font-weight: 600;">ID: ${p.id}</span>
+                        ${statusBadge}
+                    </div>
+                    <div style="font-weight: 700; font-size: 0.95rem; color: #1E293B;">
+                        ${isCrit ? '🚨 Severe Pothole Impact' : '⚠️ Surface Degradation'}
+                    </div>
+                    <div class="pothole-stats-row" style="margin: 8px 0; font-size: 0.8rem; display: flex; gap: 12px;">
+                        <div>IRI: <strong>${p.iri ? p.iri.toFixed(1) : '--'} m/km</strong></div>
+                        <div>Est. Depth: <strong>${p.depthCm || 5} cm</strong></div>
+                        <div>Cluster: <strong>${p.clusterSize || 1} hits</strong></div>
+                    </div>
+                    <div style="font-size: 0.72rem; color: #94A3B8; margin-bottom: 10px;">
+                        Lat: ${p.lat.toFixed(5)}°N, Lng: ${p.lng.toFixed(5)}°E
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                        ${!isRepaired ? `
+                            <button class="popup-action-btn btn-repair" onclick="markPotholeRepaired('${p.id}')">
+                                Mark Repaired
+                            </button>
+                        ` : ''}
+                        <button class="popup-action-btn btn-delete" onclick="flagPotholeFalsePositive('${p.id}')">
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            const marker = L.marker([p.lat, p.lng], { icon: icon }).bindPopup(popupContent);
             this.layers.potholeMarkerGroup.addLayer(marker);
         });
     }
 
-    updateVehiclePosition(lat, lng, heading = 0) {
+    /**
+     * Update Live Vehicle / Virtual Bike Marker on the Map
+     */
+    updateVehiclePosition(lat, lng) {
+        if (!lat || !lng) return;
+
         if (!this.vehicleMarker) {
-            const vehicleIcon = L.divIcon({
-                className: 'iot-vehicle-marker-wrap',
+            const bikeIcon = L.divIcon({
+                className: 'custom-bike-vehicle-marker',
                 html: `
-                    <div class="iot-vehicle-pin" id="vehicle-car-pin">
-                        <div class="radar-ping"></div>
-                        <div class="car-body">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="#007AFF" stroke="#ffffff" stroke-width="2">
-                                <polygon points="12 2 19 21 12 17 5 21 12 2"/>
-                            </svg>
-                        </div>
-                    </div>
+                    <div class="bike-radar-ring"></div>
+                    <div class="bike-pin-head">🏍️</div>
                 `,
                 iconSize: [36, 36],
                 iconAnchor: [18, 18]
             });
 
-            this.vehicleMarker = L.marker([lat, lng], { icon: vehicleIcon, zIndexOffset: 1000 });
+            this.vehicleMarker = L.marker([lat, lng], { icon: bikeIcon, zIndexOffset: 1000 });
             this.layers.vehicleGroup.addLayer(this.vehicleMarker);
         } else {
             this.vehicleMarker.setLatLng([lat, lng]);
-            const pinEl = document.getElementById('vehicle-car-pin');
-            if (pinEl && heading) {
-                pinEl.style.transform = `rotate(${heading}deg)`;
+        }
+    }
+
+    /**
+     * Handle Zoom Changes for Dynamic SVG Crack/Distress Overlays
+     */
+    handleZoomChange() {
+        const zoom = this.map.getZoom();
+        if (zoom >= 16) {
+            this.updateCrackOverlays();
+        } else {
+            this.layers.crackOverlayGroup.clearLayers();
+            this.isCrackLayerActive = false;
+        }
+    }
+
+    /**
+     * Draw Zoom-Dependent Dynamic SVG Crack Overlays on Degraded Road Segments
+     */
+    updateCrackOverlays() {
+        this.layers.crackOverlayGroup.clearLayers();
+        if (!this.activeRedSegments || this.activeRedSegments.length === 0) return;
+
+        this.activeRedSegments.forEach(seg => {
+            if (!seg.coords || seg.coords.length < 2) return;
+
+            for (let i = 0; i < seg.coords.length - 1; i++) {
+                const p1 = seg.coords[i];
+                const p2 = seg.coords[i + 1];
+
+                const crackPolyline = this.generateZigzagCoordinates(p1, p2, 6);
+
+                const crackLine = L.polyline(crackPolyline, {
+                    color: '#7F1D1D',
+                    weight: 2.5,
+                    dashArray: '3, 4',
+                    opacity: 0.9
+                });
+
+                this.layers.crackOverlayGroup.addLayer(crackLine);
+            }
+        });
+
+        this.isCrackLayerActive = true;
+    }
+
+    /**
+     * Generate Zigzag Coordinates for photorealistic surface distress
+     */
+    generateZigzagCoordinates(pt1, pt2, steps = 6) {
+        const coords = [pt1];
+        const dLat = (pt2[0] - pt1[0]) / steps;
+        const dLng = (pt2[1] - pt1[1]) / steps;
+
+        for (let j = 1; j < steps; j++) {
+            const baseLat = pt1[0] + dLat * j;
+            const baseLng = pt1[1] + dLng * j;
+            const perpOffset = (j % 2 === 0 ? 1 : -1) * 0.00008;
+
+            coords.push([baseLat + perpOffset, baseLng - perpOffset]);
+        }
+
+        coords.push(pt2);
+        return coords;
+    }
+
+    /**
+     * Focus on first critical distress zone
+     */
+    focusOnDistressZone() {
+        if (this.activeRedSegments && this.activeRedSegments.length > 0) {
+            const firstRed = this.activeRedSegments[0];
+            if (firstRed.coords && firstRed.coords.length > 0) {
+                this.map.setView(firstRed.coords[0], 17, { animate: true });
             }
         }
     }
-
-    focusOnDistressZone() {
-        if (this.activeRedSegments.length > 0) {
-            const firstRed = this.activeRedSegments[0];
-            const midIndex = Math.floor(firstRed.coords.length / 2);
-            const focusCoord = firstRed.coords[midIndex];
-
-            this.map.flyTo(focusCoord, 16.5, {
-                animate: true,
-                duration: 1.2
-            });
-        }
-    }
-
-    fitToCurrentRoute() {
-        if (!this.selectedRoute) return;
-        const allCoords = [];
-        this.selectedRoute.segments.forEach(s => s.coords.forEach(c => allCoords.push(c)));
-        if (allCoords.length > 0) {
-            this.map.fitBounds(L.latLngBounds(allCoords), {
-                paddingTopLeft: [80, 80],
-                paddingBottomRight: [80, 160],
-                animate: true
-            });
-        }
-    }
-
-    zoomIn() { this.map.zoomIn(); }
-    zoomOut() { this.map.zoomOut(); }
 }
 
-window.roadHealthMap = null;
+window.RoadHealthMap = RoadHealthMap;

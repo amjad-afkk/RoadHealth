@@ -1,7 +1,7 @@
 /**
- * RoadHealth — Express + WebSocket Server Entry Point
+ * RoadHealth — Express + WebSocket Server Entry Point (PostGIS & SQLite Unified)
  * 
- * Starts HTTP API server and WebSocket hub for real-time telemetry.
+ * Starts HTTP API server, PostGIS spatial database connection, and WebSocket hub.
  */
 
 require('dotenv').config();
@@ -28,7 +28,7 @@ const app = express();
 // Middleware
 app.use(cors({
     origin: '*',  // Allow all origins for development (file://, localhost, etc.)
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json({ limit: '5mb' }));
@@ -45,44 +45,62 @@ app.use('/api/v1/routes', routesRouter);
 // Health check
 app.get('/api/v1/health', (req, res) => {
     const { getClientCount } = require('./ws/realtimeHub');
+    const { getEngineInfo } = require('./db/database');
+    const engine = getEngineInfo();
+
     res.json({
         status: 'ok',
         server: 'RoadHealth IoT Backend',
-        version: '1.0.0',
+        version: '2.0.0 (PostGIS & Spatial Engine)',
+        engine: engine.version,
+        databaseType: engine.type,
         uptime: process.uptime(),
         websocketClients: getClientCount(),
         timestamp: new Date().toISOString()
     });
 });
 
-// Create HTTP server and attach WebSocket
+// Create HTTP server
 const server = http.createServer(app);
 
-// Initialize database
-console.log('[Server] Initializing database...');
-initDb(DB_PATH);
+// Start server after database initialization
+async function startServer() {
+    try {
+        console.log('[Server] Connecting & initializing database...');
+        const dbInfo = await initDb(DB_PATH);
+        console.log(`[Server] Active Database: ${dbInfo.type.toUpperCase()} (${dbInfo.version})`);
 
-// Initialize WebSocket hub
-initWS(server);
+        // Initialize WebSocket hub
+        initWS(server);
 
-// Start listening
-server.listen(PORT, () => {
-    console.log('');
-    console.log('  ╔══════════════════════════════════════════════════╗');
-    console.log('  ║                                                  ║');
-    console.log('  ║   🛣️  RoadHealth IoT Backend                     ║');
-    console.log('  ║                                                  ║');
-    console.log(`  ║   HTTP API:    http://localhost:${PORT}              ║`);
-    console.log(`  ║   WebSocket:   ws://localhost:${PORT}               ║`);
-    console.log(`  ║   Frontend:    http://localhost:${PORT}/index.html   ║`);
-    console.log('  ║                                                  ║');
-    console.log('  ║   API Routes:                                    ║');
-    console.log('  ║     GET  /api/v1/devices                         ║');
-    console.log('  ║     POST /api/v1/telemetry                       ║');
-    console.log('  ║     GET  /api/v1/potholes                        ║');
-    console.log('  ║     POST /api/v1/routes/analyze                  ║');
-    console.log('  ║     GET  /api/v1/health                          ║');
-    console.log('  ║                                                  ║');
-    console.log('  ╚══════════════════════════════════════════════════╝');
-    console.log('');
-});
+        server.listen(PORT, () => {
+            console.log('');
+            console.log('  ╔══════════════════════════════════════════════════╗');
+            console.log('  ║                                                  ║');
+            console.log('  ║   🛣️  RoadHealth IoT & PostGIS Spatial Backend    ║');
+            console.log('  ║                                                  ║');
+            console.log(`  ║   HTTP API:    http://localhost:${PORT}              ║`);
+            console.log(`  ║   WebSocket:   ws://localhost:${PORT}               ║`);
+            console.log(`  ║   Frontend:    http://localhost:${PORT}/index.html   ║`);
+            console.log(`  ║   Engine:      ${(dbInfo.version).padEnd(34)}║`);
+            console.log('  ║                                                  ║');
+            console.log('  ║   API Routes:                                    ║');
+            console.log('  ║     GET   /api/v1/devices                        ║');
+            console.log('  ║     POST  /api/v1/telemetry                      ║');
+            console.log('  ║     POST  /api/v1/telemetry/simulate             ║');
+            console.log('  ║     GET   /api/v1/potholes                       ║');
+            console.log('  ║     GET   /api/v1/potholes/heatmap               ║');
+            console.log('  ║     GET   /api/v1/potholes/export                ║');
+            console.log('  ║     POST  /api/v1/routes/analyze                 ║');
+            console.log('  ║     GET   /api/v1/health                         ║');
+            console.log('  ║                                                  ║');
+            console.log('  ╚══════════════════════════════════════════════════╝');
+            console.log('');
+        });
+    } catch (err) {
+        console.error('[Server] Critical startup error:', err);
+        process.exit(1);
+    }
+}
+
+startServer();

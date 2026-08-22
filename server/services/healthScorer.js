@@ -1,11 +1,11 @@
 /**
- * RoadHealth — Road Health Scorer Service (Strict Live Mode)
+ * RoadHealth — Road Health Scorer Service (PostGIS & Spatial Analysis)
  * 
  * Given a route polyline, cross-references stored telemetry and pothole data
- * to compute real health scores per segment. Zero random numbers or mock jitter.
+ * to compute real health scores per segment.
  */
 
-const { getDb } = require('../db/database');
+const { isPostGIS, getPool, getDb } = require('../db/database');
 const { haversineDistance } = require('./detectionEngine');
 
 // Buffer distance around route to query telemetry (meters)
@@ -15,10 +15,9 @@ const CORRIDOR_BUFFER_M = 30;
  * Analyze a route's road health using stored telemetry and pothole data
  * 
  * @param {Array} segments - Array of route segments, each with coords: [[lat, lng], ...]
- * @returns {Object} - Analyzed route with real data
+ * @returns {Promise<Object>} - Analyzed route with real data
  */
-function analyzeRouteHealth(segments) {
-    const db = getDb();
+async function analyzeRouteHealth(segments) {
     const analyzedSegments = [];
 
     let totalLengthM = 0;
@@ -54,66 +53,90 @@ function analyzeRouteHealth(segments) {
         const latBuffer = CORRIDOR_BUFFER_M / 111320;
         const lngBuffer = CORRIDOR_BUFFER_M / (111320 * Math.cos(((minLat + maxLat) / 2) * Math.PI / 180));
 
-        // Query telemetry within this segment's corridor
-        const telemetryData = db.prepare(`
-            SELECT AVG(iri_estimate) as avg_iri, 
-                   AVG(vibration_mag) as avg_vib,
-                   COUNT(*) as reading_count,
-                   SUM(pothole_trigger) as trigger_count
-            FROM telemetry
-            WHERE lat BETWEEN @minLat AND @maxLat
-              AND lng BETWEEN @minLng AND @maxLng
-        `).get({
-            minLat: minLat - latBuffer,
-            maxLat: maxLat + latBuffer,
-            minLng: minLng - lngBuffer,
-            maxLng: maxLng + lngBuffer
-        });
+        let telemetryData = null;
+        let potholeData = null;
 
-        // Query potholes within this segment's corridor
-        const potholeData = db.prepare(`
-            SELECT COUNT(*) as pothole_count,
-                   MAX(iri) as max_iri,
-                   SUM(cluster_size) as total_detections
-            FROM potholes
-            WHERE lat BETWEEN @minLat AND @maxLat
-              AND lng BETWEEN @minLng AND @maxLng
-              AND false_positive = 0
-        `).get({
-            minLat: minLat - latBuffer,
-            maxLat: maxLat + latBuffer,
-            minLng: minLng - lngBuffer,
-            maxLng: maxLng + lngBuffer
-        });
+        if (isPostGIS()) {
+            const pool = getPool();
+            const tRes = await pool.query(`
+                SELECT AVG(iri_estimate) as avg_iri, 
+                       AVG(vibration_mag) as avg_vib,
+                       COUNT(*) as reading_count,
+                       SUM(pothole_trigger) as trigger_count
+                FROM telemetry
+                WHERE lat BETWEEN $1 AND $2
+                  AND lng BETWEEN $3 AND $4
+            `, [minLat - latBuffer, maxLat + latBuffer, minLng - lngBuffer, maxLng + lngBuffer]);
+            telemetryData = tRes.rows[0];
 
-        // Determine health from real stored data
-        const avgIri = telemetryData ? (telemetryData.avg_iri || 0) : 0;
-        const avgVib = telemetryData ? (telemetryData.avg_vib || 0) : 0;
-        const potholeCount = potholeData ? (potholeData.pothole_count || 0) : 0;
+            const pRes = await pool.query(`
+                SELECT COUNT(*) as pothole_count,
+                       MAX(iri) as max_iri,
+                       SUM(cluster_size) as total_detections
+                FROM potholes
+                WHERE lat BETWEEN $1 AND $2
+                  AND lng BETWEEN $3 AND $4
+                  AND false_positive = 0
+            `, [minLat - latBuffer, maxLat + latBuffer, minLng - lngBuffer, maxLng + lngBuffer]);
+            potholeData = pRes.rows[0];
+        } else {
+            const db = getDb();
+            telemetryData = db.prepare(`
+                SELECT AVG(iri_estimate) as avg_iri, 
+                       AVG(vibration_mag) as avg_vib,
+                       COUNT(*) as reading_count,
+                       SUM(pothole_trigger) as trigger_count
+                FROM telemetry
+                WHERE lat BETWEEN @minLat AND @maxLat
+                  AND lng BETWEEN @minLng AND @maxLng
+            `).get({
+                minLat: minLat - latBuffer,
+                maxLat: maxLat + latBuffer,
+                minLng: minLng - lngBuffer,
+                maxLng: maxLng + lngBuffer
+            });
+
+            potholeData = db.prepare(`
+                SELECT COUNT(*) as pothole_count,
+                       MAX(iri) as max_iri,
+                       SUM(cluster_size) as total_detections
+                FROM potholes
+                WHERE lat BETWEEN @minLat AND @maxLat
+                  AND lng BETWEEN @minLng AND @maxLng
+                  AND false_positive = 0
+            `).get({
+                minLat: minLat - latBuffer,
+                maxLat: maxLat + latBuffer,
+                minLng: minLng - lngBuffer,
+                maxLng: maxLng + lngBuffer
+            });
+        }
+
+        // Determine health from stored data
+        const avgIri = telemetryData ? (parseFloat(telemetryData.avg_iri) || 0) : 0;
+        const avgVib = telemetryData ? (parseFloat(telemetryData.avg_vib) || 0) : 0;
+        const potholeCount = potholeData ? (parseInt(potholeData.pothole_count) || 0) : 0;
+        const readingCount = telemetryData ? (parseInt(telemetryData.reading_count) || 0) : 0;
         const segLengthKm = segLengthM / 1000;
         const potholeDensity = segLengthKm > 0 ? potholeCount / segLengthKm : 0;
 
         let health = 'good';
         let finalIri = avgIri;
 
-        if (telemetryData && telemetryData.reading_count > 0) {
-            // Real telemetry data exists for this segment
+        if (readingCount > 0) {
             if (avgIri >= 4.5 || potholeDensity >= 1.5) {
                 health = 'bad';
             } else if (avgIri >= 2.5 || potholeDensity >= 0.5) {
                 health = 'moderate';
             }
         } else if (potholeCount > 0) {
-            // Potholes logged, no raw telemetry
             health = potholeCount >= 3 ? 'bad' : 'moderate';
-            finalIri = potholeData.max_iri || 3.0;
+            finalIri = parseFloat(potholeData.max_iri) || 3.0;
         } else {
-            // Unscanned segment — baseline nominal (1.0 m/km, 0 potholes)
             finalIri = 1.0;
             health = 'good';
         }
 
-        // Accumulate for ratio calculation
         if (health === 'good') greenLengthM += segLengthM;
         else if (health === 'moderate') yellowLengthM += segLengthM;
         else redLengthM += segLengthM;
@@ -130,7 +153,7 @@ function analyzeRouteHealth(segments) {
             vibrationAvg: +avgVib.toFixed(2),
             lengthM: Math.round(segLengthM),
             lengthKm: +(segLengthM / 1000).toFixed(2),
-            readingCount: telemetryData ? telemetryData.reading_count : 0,
+            readingCount,
             color: health === 'good' ? '#10B981' : (health === 'moderate' ? '#F59E0B' : '#EF4444')
         });
     }
@@ -175,21 +198,37 @@ function analyzeRouteHealth(segments) {
 }
 
 /**
- * Get summary statistics for the telemetry database
+ * Get summary statistics for the database
  */
-function getDatabaseStats() {
-    const db = getDb();
+async function getDatabaseStats() {
+    if (isPostGIS()) {
+        const pool = getPool();
+        const tCount = await pool.query('SELECT COUNT(*) as cnt FROM telemetry');
+        const pCount = await pool.query('SELECT COUNT(*) as cnt FROM potholes WHERE false_positive = 0');
+        const critCount = await pool.query("SELECT COUNT(*) as cnt FROM potholes WHERE severity = 'critical' AND false_positive = 0");
+        const actDev = await pool.query("SELECT COUNT(*) as cnt FROM devices WHERE status = 'Active'");
+        const totDev = await pool.query('SELECT COUNT(*) as cnt FROM devices');
+        const latestT = await pool.query('SELECT timestamp FROM telemetry ORDER BY id DESC LIMIT 1');
 
-    const stats = {
-        totalTelemetryRecords: db.prepare('SELECT COUNT(*) as cnt FROM telemetry').get().cnt,
-        totalPotholes: db.prepare('SELECT COUNT(*) as cnt FROM potholes WHERE false_positive = 0').get().cnt,
-        criticalPotholes: db.prepare("SELECT COUNT(*) as cnt FROM potholes WHERE severity = 'critical' AND false_positive = 0").get().cnt,
-        activeDevices: db.prepare("SELECT COUNT(*) as cnt FROM devices WHERE status = 'Active'").get().cnt,
-        totalDevices: db.prepare('SELECT COUNT(*) as cnt FROM devices').get().cnt,
-        latestTelemetry: db.prepare('SELECT timestamp FROM telemetry ORDER BY id DESC LIMIT 1').get()?.timestamp || 'None'
-    };
-
-    return stats;
+        return {
+            totalTelemetryRecords: parseInt(tCount.rows[0]?.cnt || 0),
+            totalPotholes: parseInt(pCount.rows[0]?.cnt || 0),
+            criticalPotholes: parseInt(critCount.rows[0]?.cnt || 0),
+            activeDevices: parseInt(actDev.rows[0]?.cnt || 0),
+            totalDevices: parseInt(totDev.rows[0]?.cnt || 0),
+            latestTelemetry: latestT.rows[0]?.timestamp || 'None'
+        };
+    } else {
+        const db = getDb();
+        return {
+            totalTelemetryRecords: db.prepare('SELECT COUNT(*) as cnt FROM telemetry').get().cnt,
+            totalPotholes: db.prepare('SELECT COUNT(*) as cnt FROM potholes WHERE false_positive = 0').get().cnt,
+            criticalPotholes: db.prepare("SELECT COUNT(*) as cnt FROM potholes WHERE severity = 'critical' AND false_positive = 0").get().cnt,
+            activeDevices: db.prepare("SELECT COUNT(*) as cnt FROM devices WHERE status = 'Active'").get().cnt,
+            totalDevices: db.prepare('SELECT COUNT(*) as cnt FROM devices').get().cnt,
+            latestTelemetry: db.prepare('SELECT timestamp FROM telemetry ORDER BY id DESC LIMIT 1').get()?.timestamp || 'None'
+        };
+    }
 }
 
 module.exports = { analyzeRouteHealth, getDatabaseStats };

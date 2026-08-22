@@ -1548,3 +1548,236 @@ html, body {
         display: none;
     }
 }
+
+/* ============================================================
+   14. Route Roughness Profile & Elevation Drawer
+   ============================================================ */
+.route-roughness-drawer {
+    position: absolute;
+    bottom: 24px;
+    left: 440px;
+    right: 320px;
+    z-index: 1000;
+    background: var(--bg-glass-strong);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-floating);
+    padding: 16px 20px;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.route-roughness-drawer.hidden {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(30px);
+}
+
+.profile-drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.profile-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.92rem;
+    color: var(--text-primary);
+}
+
+.profile-route-name {
+    font-size: 0.76rem;
+    background: var(--apple-blue-subtle);
+    color: var(--apple-blue);
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    font-weight: 600;
+}
+
+.profile-stat-badge {
+    font-size: 0.78rem;
+    background: #F1F5F9;
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    border-radius: 8px;
+}
+
+.profile-canvas-container {
+    width: 100%;
+    height: 70px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #0F172A;
+}
+
+#routeProfileCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.btn-inspect-profile {
+    margin-top: 10px;
+    width: 100%;
+    background: #F8FAFC;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 10px;
+    padding: 7px 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--apple-blue);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.btn-inspect-profile:hover {
+    background: var(--apple-blue-subtle);
+    border-color: var(--apple-blue);
+}
+
+/* ============================================================
+   15. Export Modal & Pothole Actions
+   ============================================================ */
+.dropdown-header {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-tertiary);
+    padding: 6px 12px 2px 12px;
+}
+
+.export-format-btn {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: #F8FAFC;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    padding: 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s ease;
+    width: 100%;
+}
+
+.export-format-btn:hover {
+    background: #FFFFFF;
+    border-color: var(--apple-blue);
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-1px);
+}
+
+.export-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: #FFFFFF;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.export-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.export-desc {
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.popup-action-btn {
+    flex: 1;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.btn-repair {
+    background: #10B981;
+    color: #FFFFFF;
+}
+
+.btn-repair:hover {
+    background: #059669;
+}
+
+.btn-delete {
+    background: #F1F5F9;
+    color: #64748B;
+}
+
+.btn-delete:hover {
+    background: #E2E8F0;
+    color: #334155;
+}
+
+/* Vehicle Radar Pulse */
+.custom-bike-vehicle-marker {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bike-radar-ring {
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(0, 122, 255, 0.25);
+    animation: radarPulse 1.8s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+
+.bike-pin-head {
+    font-size: 20px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+    z-index: 2;
+}
+
+@keyframes radarPulse {
+    0% { transform: scale(0.6); opacity: 0.9; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+
+.pin-core.green {
+    background: #10B981;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.pin-core.red {
+    background: #EF4444;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
