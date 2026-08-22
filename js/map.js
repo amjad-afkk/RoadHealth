@@ -1,13 +1,4 @@
-/**
- * RoadHealth - Leaflet Map Architecture & Dynamic Zoom Engine
- * Features:
- * - High-Resolution Satellite Imagery with zero "no map data" errors in India (Google Hybrid + Esri HD)
- * - CartoDB Positron Light Street Map Tileset
- * - Multiple Alternative Routes on-map rendering & interactive click selection
- * - Health-colored segmented polylines with subtle outer glow/casing
- * - Dynamic Zoom-Dependent Road Crack Overlays (rendered when zoom >= 16 over Red segments)
- * - Real-time ESP32 IoT telemetry vehicle tracking
- */
+
 
 class RoadHealthMap {
     constructor(containerId = 'map') {
