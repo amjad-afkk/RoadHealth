@@ -7,33 +7,60 @@ router.get('/', async (req, res) => {
         let devices = [];
         if (isPostGIS()) {
             const pool = getPool();
-            const result = await pool.query('SELECT * FROM devices ORDER BY bike_plate');
+            const result = await pool.query(`
+                SELECT d.*, 
+                       t.lat as live_lat, 
+                       t.lng as live_lng, 
+                       t.speed_kmh as live_speed,
+                       t.accel_z as live_az,
+                       t.iri_estimate as live_iri,
+                       t.vibration_mag as live_vib,
+                       t.pothole_trigger as live_trigger,
+                       t.timestamp as live_timestamp
+                FROM devices d
+                LEFT JOIN LATERAL (
+                    SELECT * FROM telemetry 
+                    WHERE device_id = d.id 
+                    ORDER BY id DESC 
+                    LIMIT 1
+                ) t ON true
+                ORDER BY d.id
+            `);
             devices = result.rows;
         } else {
             const db = getDb();
-            devices = db.prepare('SELECT * FROM devices ORDER BY bike_plate').all();
+            devices = db.prepare('SELECT * FROM devices ORDER BY id').all();
         }
 
         const formatted = devices.map(d => ({
             nodeId: d.id,
-            bikePlate: d.bike_plate,
-            bikeModel: d.bike_model,
-            riderName: d.rider_name,
-            location: d.location || 'Not active yet',
-            batteryPct: d.battery_pct,
-            batteryVoltage: d.battery_voltage,
-            batteryStatus: d.battery_status,
-            firmware: d.firmware,
+            bikePlate: d.bike_plate || 'TS 09 EA 4412',
+            bikeModel: d.bike_model || 'ESP32 Patrol Node',
+            riderName: d.rider_name || 'Hardware Patrol Unit',
+            location: d.live_lat ? `${parseFloat(d.live_lat).toFixed(4)}°N, ${parseFloat(d.live_lng).toFixed(4)}°E (Speed: ${parseFloat(d.live_speed || 0).toFixed(1)} km/h)` : (d.location || 'Awaiting GPS Fix (TinyGPS++)'),
+            batteryPct: d.battery_pct || 98,
+            batteryVoltage: d.battery_voltage || 4.15,
+            firmware: d.firmware || 'v2.4.2-Release',
             sensors: {
-                accel: d.accel_sensor,
-                accelHealth: 'Calibrated',
-                gps: d.gps_sensor,
-                network: d.network_info,
-                sdStorage: d.sd_storage,
-                status: d.status
+                accel: 'MPU6500 6-DoF (100 Hz)',
+                gps: 'NEO-6M (TinyGPS++)',
+                network: 'WiFi (vivo v29)',
+                sampling: '100 Hz (10ms)',
+                interval: '1000 ms (1 Hz)',
+                status: d.status || 'Active'
             },
-            lastAnomaly: d.last_anomaly || 'None',
-            lastSeenAt: d.last_seen_at
+            telemetry: {
+                lat: d.live_lat ? parseFloat(d.live_lat) : null,
+                lng: d.live_lng ? parseFloat(d.live_lng) : null,
+                speedKmh: d.live_speed ? parseFloat(d.live_speed) : 0,
+                accelZ: d.live_az ? parseFloat(d.live_az) : 9.81,
+                iri: d.live_iri ? parseFloat(d.live_iri) : 1.1,
+                vibration: d.live_vib ? parseFloat(d.live_vib) : 0.2,
+                potholeTrigger: d.live_trigger === 1,
+                lastPacketAt: d.live_timestamp || d.last_seen_at
+            },
+            lastAnomaly: d.live_trigger === 1 ? '🚨 Pothole Impact (Z-Spike > 2.2G)' : (d.last_anomaly || 'Nominal (G-Force < 2.2G)'),
+            lastSeenAt: d.live_timestamp || d.last_seen_at
         }));
 
         res.json({ success: true, devices: formatted, count: formatted.length });

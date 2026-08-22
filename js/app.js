@@ -65,8 +65,10 @@ async function loadPresetRoute(presetKey) {
 }
 
 async function handleCustomRouteSearch() {
-    const inOrigin = document.getElementById('inputOrigin').value.trim();
-    const inDest = document.getElementById('inputDest').value.trim();
+    const inOriginEl = document.getElementById('inputOrigin');
+    const inDestEl = document.getElementById('inputDest');
+    const inOrigin = inOriginEl?.value?.trim() || '';
+    const inDest = inDestEl?.value?.trim() || '';
 
     if (!inOrigin || !inDest) {
         alert('Please enter both origin and destination addresses in Telangana.');
@@ -80,19 +82,31 @@ async function handleCustomRouteSearch() {
         let originPt = AppState.originPoint;
         if (!originPt || originPt.name !== inOrigin) {
             const geocoded = await window.roadHealthAPI.geocodeAddress(inOrigin);
-            if (geocoded.length > 0) {
-                originPt = { name: inOrigin, lat: geocoded[0].lat, lng: geocoded[0].lng };
+            if (geocoded && geocoded.length > 0) {
+                originPt = { name: geocoded[0].shortName || inOrigin, lat: geocoded[0].lat, lng: geocoded[0].lng };
                 AppState.originPoint = originPt;
+                if (inOriginEl) inOriginEl.value = originPt.name;
             }
         }
 
         let destPt = AppState.destPoint;
         if (!destPt || destPt.name !== inDest) {
             const geocoded = await window.roadHealthAPI.geocodeAddress(inDest);
-            if (geocoded.length > 0) {
-                destPt = { name: inDest, lat: geocoded[0].lat, lng: geocoded[0].lng };
+            if (geocoded && geocoded.length > 0) {
+                destPt = { name: geocoded[0].shortName || inDest, lat: geocoded[0].lat, lng: geocoded[0].lng };
                 AppState.destPoint = destPt;
+                if (inDestEl) inDestEl.value = destPt.name;
             }
+        }
+
+        if (!originPt || !originPt.lat) {
+            alert(`Could not locate origin: "${inOrigin}". Please select from suggestions or click the map.`);
+            return;
+        }
+
+        if (!destPt || !destPt.lat) {
+            alert(`Could not locate destination: "${inDest}". Please select from suggestions or click the map.`);
+            return;
         }
 
         await calculateAndRenderLiveRoutes(originPt, destPt);
@@ -103,6 +117,29 @@ async function handleCustomRouteSearch() {
         if (btnText) btnText.innerText = 'Find Safest Routes';
     }
 }
+
+function setMapPointAs(type, lat, lng) {
+    if (type === 'origin') {
+        const inOrigin = document.getElementById('inputOrigin');
+        const name = `Point (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+        if (inOrigin) inOrigin.value = name;
+        AppState.originPoint = { name, lat, lng };
+    } else if (type === 'dest') {
+        const inDest = document.getElementById('inputDest');
+        const name = `Point (${lat.toFixed(4)}, ${lng.toFixed(4)})`;
+        if (inDest) inDest.value = name;
+        AppState.destPoint = { name, lat, lng };
+    }
+
+    if (window.roadHealthMap && window.roadHealthMap.map) {
+        window.roadHealthMap.map.closePopup();
+    }
+
+    if (AppState.originPoint && AppState.destPoint) {
+        handleCustomRouteSearch();
+    }
+}
+window.setMapPointAs = setMapPointAs;
 
 async function calculateAndRenderLiveRoutes(origin, dest) {
     const rawRoutesList = await window.roadHealthAPI.calculateMultipleRoutesBetween(origin, dest, origin.name, dest.name);
@@ -496,28 +533,28 @@ function renderAdminFleetList(devices) {
 
             <div class="device-info-grid">
                 <div class="device-info-item">
-                    <span class="device-info-label">Assigned Rider</span>
-                    <span class="device-info-val">${d.riderName}</span>
-                </div>
-                <div class="device-info-item">
-                    <span class="device-info-label">Bike Model</span>
-                    <span class="device-info-val">${d.bikeModel}</span>
-                </div>
-                <div class="device-info-item">
-                    <span class="device-info-label">Patrol Sector</span>
+                    <span class="device-info-label">Live GPS Position</span>
                     <span class="device-info-val">${d.location}</span>
                 </div>
                 <div class="device-info-item">
-                    <span class="device-info-label">Battery Level</span>
+                    <span class="device-info-label">Live Surface IRI</span>
+                    <span class="device-info-val" style="color: ${d.telemetry?.iri >= 4.5 ? '#EF4444' : '#10B981'};">${d.telemetry?.iri ? d.telemetry.iri.toFixed(1) + ' m/km' : '1.1 m/km'}</span>
+                </div>
+                <div class="device-info-item">
+                    <span class="device-info-label">Telemetry Status</span>
+                    <span class="device-info-val">${d.lastAnomaly}</span>
+                </div>
+                <div class="device-info-item">
+                    <span class="device-info-label">Battery Voltage</span>
                     <span class="device-info-val" style="color: #10B981;">${d.batteryPct}% (${d.batteryVoltage}V)</span>
                 </div>
             </div>
 
             <div class="device-sensor-tags">
-                <span class="sensor-tag"><i data-lucide="activity" style="width: 11px; height: 11px; color: #007AFF;"></i>${d.sensors?.accel || 'MPU6500 100Hz'}</span>
-                <span class="sensor-tag"><i data-lucide="navigation" style="width: 11px; height: 11px; color: #10B981;"></i>${d.sensors?.gps || 'NEO-6M GPS'}</span>
-                <span class="sensor-tag"><i data-lucide="radio" style="width: 11px; height: 11px; color: #8B5CF6;"></i>${d.sensors?.network || '4G LTE'}</span>
-                <span class="sensor-tag"><i data-lucide="hard-drive" style="width: 11px; height: 11px;"></i>${d.sensors?.sdStorage || '32GB Log'}</span>
+                <span class="sensor-tag"><i data-lucide="activity" style="width: 11px; height: 11px; color: #007AFF;"></i>MPU6500 100Hz (I2C)</span>
+                <span class="sensor-tag"><i data-lucide="navigation" style="width: 11px; height: 11px; color: #10B981;"></i>NEO-6M GPS (TinyGPS++)</span>
+                <span class="sensor-tag"><i data-lucide="wifi" style="width: 11px; height: 11px; color: #8B5CF6;"></i>WiFi (vivo v29)</span>
+                <span class="sensor-tag"><i data-lucide="clock" style="width: 11px; height: 11px;"></i>1000ms TX Rate</span>
             </div>
         `;
 
@@ -745,6 +782,14 @@ function setupAutocompleteListeners() {
                 });
             }, 180);
         });
+
+        inOrigin.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                dropOrigin.classList.remove('open');
+                handleCustomRouteSearch();
+            }
+        });
     }
 
     if (inDest && dropDest) {
@@ -763,6 +808,14 @@ function setupAutocompleteListeners() {
                     dropDest.classList.remove('open');
                 });
             }, 180);
+        });
+
+        inDest.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                dropDest.classList.remove('open');
+                handleCustomRouteSearch();
+            }
         });
     }
 

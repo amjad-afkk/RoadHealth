@@ -89,6 +89,22 @@ class RoadHealthMap {
             }
         });
 
+        this.map.on('click', (e) => {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            const popupContent = `
+                <div style="font-size: 0.82rem; padding: 4px; min-width: 170px;">
+                    <div style="font-weight: 700; margin-bottom: 4px; color: #1E293B;">📍 Point on Map</div>
+                    <div style="font-size: 0.72rem; color: #64748B; margin-bottom: 8px;">${lat.toFixed(5)}°N, ${lng.toFixed(5)}°E</div>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="popup-action-btn" style="background: #10B981; color: white; flex: 1; padding: 4px 8px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.74rem;" onclick="setMapPointAs('origin', ${lat}, ${lng})">Start Here</button>
+                        <button class="popup-action-btn" style="background: #007AFF; color: white; flex: 1; padding: 4px 8px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.74rem;" onclick="setMapPointAs('dest', ${lat}, ${lng})">End Here</button>
+                    </div>
+                </div>
+            `;
+            L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(this.map);
+        });
+
         console.log('[RoadHealth Map] Initialized with Multi-Basemaps & PostGIS.');
     }
 

@@ -84,3 +84,8 @@ CREATE INDEX IF NOT EXISTS idx_potholes_severity   ON potholes(severity);
 CREATE INDEX IF NOT EXISTS idx_potholes_status     ON potholes(status);
 CREATE INDEX IF NOT EXISTS idx_segments_route      ON road_segments(route_id);
 
+INSERT INTO devices (id, bike_plate, bike_model, rider_name, location, battery_pct, battery_voltage, battery_status, firmware, status, accel_sensor, gps_sensor, network_info, sd_storage, last_anomaly)
+VALUES 
+    ('ESP32-NODE-TS09-EA-4412', 'TS 09 EA 4412', 'Royal Enfield Hunter 350', 'Patrol Unit 1 (R. Naresh)', 'Hitec City - Madhapur Sector', 94, 4.18, 'Good', 'v2.4.2-Release', 'Active', 'MPU6500 6-DoF (100 Hz)', 'NEO-6M GPS (3D Fix)', '4G LTE SIM7600', 'SanDisk 32GB', 'Nominal (No Hazards Detected)')
+ON CONFLICT (id) DO NOTHING;
+
