@@ -123,9 +123,15 @@ router.post('/', async (req, res) => {
             device_id: body.deviceId,
             lat,
             lng,
+            speed_kmh: speedKmh,
+            accel_x: accelX,
+            accel_y: accelY,
             accel_z: accelZ,
+            gyro_pitch: gyroPitch,
+            gyro_roll: gyroRoll,
             iri_estimate: iriEstimate,
-            vibration_mag: vibrationMag
+            vibration_mag: vibrationMag,
+            pothole_trigger: potholeTrigger
         };
 
         const detection = await analyzeTelemetry(telemetryRow);

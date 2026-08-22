@@ -42,11 +42,11 @@ router.get('/', async (req, res) => {
             batteryVoltage: d.battery_voltage || 4.15,
             firmware: d.firmware || 'v2.4.2-Release',
             sensors: {
-                accel: 'MPU6500 6-DoF (100 Hz)',
+                accel: 'MPU6500 6-DoF (200 Hz FreeRTOS)',
                 gps: 'NEO-6M (TinyGPS++)',
                 network: 'WiFi (vivo v29)',
-                sampling: '100 Hz (10ms)',
-                interval: '1000 ms (1 Hz)',
+                sampling: '200 Hz (5ms FreeRTOS Core 1)',
+                interval: '500 ms (2 Hz FreeRTOS Core 0)',
                 status: d.status || 'Active'
             },
             telemetry: {

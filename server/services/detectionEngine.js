@@ -11,12 +11,7 @@ const CONFIG = {
 };
 
 async function analyzeTelemetry(telemetryRow) {
-    const { id, device_id, lat, lng, speed_kmh, accel_x, accel_y, accel_z, iri_estimate, vibration_mag } = telemetryRow;
-
-    const speed = parseFloat(speed_kmh || 0);
-    if (speed < 3.0) {
-        return null;
-    }
+    const { id, device_id, lat, lng, speed_kmh, accel_x, accel_y, accel_z, iri_estimate, vibration_mag, pothole_trigger } = telemetryRow;
 
     const ax = parseFloat(accel_x || 0);
     const ay = parseFloat(accel_y || 0);
@@ -25,9 +20,10 @@ async function analyzeTelemetry(telemetryRow) {
     const dynamicDeviation = Math.abs(totalMag - CONFIG.GRAVITY);
     const gForce = dynamicDeviation / CONFIG.GRAVITY;
 
-    const isSpikeDetected = gForce >= CONFIG.Z_SPIKE_THRESHOLD_G;
+    const isSpikeDetected = (pothole_trigger === 1) || (gForce >= CONFIG.Z_SPIKE_THRESHOLD_G);
     const iriValue = parseFloat(iri_estimate || estimateIRI(vibration_mag));
-    const isHighIRI = iriValue >= CONFIG.IRI_MODERATE_THRESHOLD;
+    const speed = parseFloat(speed_kmh || 0);
+    const isHighIRI = (iriValue >= CONFIG.IRI_MODERATE_THRESHOLD) && (speed >= 3.0 || pothole_trigger === 1 || gForce >= 1.5);
 
     if (!isSpikeDetected && !isHighIRI) {
         return null;
@@ -36,11 +32,11 @@ async function analyzeTelemetry(telemetryRow) {
     let severity = 'moderate';
     let estimatedDepth = 0;
 
-    if (gForce >= CONFIG.Z_SPIKE_THRESHOLD_G || iriValue >= CONFIG.IRI_CRITICAL_THRESHOLD) {
+    if (gForce >= CONFIG.Z_SPIKE_THRESHOLD_G || iriValue >= CONFIG.IRI_CRITICAL_THRESHOLD || pothole_trigger === 1) {
         severity = 'critical';
-        estimatedDepth = Math.round(gForce * 2.0 * 10) / 10;
+        estimatedDepth = Math.max(5.0, Math.round(gForce * 2.0 * 10) / 10);
     } else {
-        estimatedDepth = Math.round(gForce * 1.2 * 10) / 10;
+        estimatedDepth = Math.max(3.0, Math.round(gForce * 1.2 * 10) / 10);
     }
 
     const existing = await findNearbyPothole(lat, lng, CONFIG.DEDUP_RADIUS_M);

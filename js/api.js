@@ -1,9 +1,7 @@
 class RoadHealthAPI {
     constructor() {
         this.config = {
-            baseUrl: (typeof window !== 'undefined' && window.location && window.location.origin && window.location.protocol !== 'file:')
-                ? `${window.location.origin}/api/v1`
-                : 'http://localhost:8000/api/v1',
+            baseUrl: 'https://roadhealth.onrender.com/api/v1',
             timeoutMs: 10000
         };
     }

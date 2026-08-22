@@ -551,10 +551,10 @@ function renderAdminFleetList(devices) {
             </div>
 
             <div class="device-sensor-tags">
-                <span class="sensor-tag"><i data-lucide="activity" style="width: 11px; height: 11px; color: #007AFF;"></i>MPU6500 100Hz (I2C)</span>
+                <span class="sensor-tag"><i data-lucide="activity" style="width: 11px; height: 11px; color: #007AFF;"></i>MPU6500 200Hz (FreeRTOS Core 1)</span>
                 <span class="sensor-tag"><i data-lucide="navigation" style="width: 11px; height: 11px; color: #10B981;"></i>NEO-6M GPS (TinyGPS++)</span>
                 <span class="sensor-tag"><i data-lucide="wifi" style="width: 11px; height: 11px; color: #8B5CF6;"></i>WiFi (vivo v29)</span>
-                <span class="sensor-tag"><i data-lucide="clock" style="width: 11px; height: 11px;"></i>1000ms TX Rate</span>
+                <span class="sensor-tag"><i data-lucide="clock" style="width: 11px; height: 11px;"></i>500ms (2 Hz FreeRTOS Core 0)</span>
             </div>
         `;
 
@@ -597,9 +597,9 @@ window.adminTriggerDecaySweep = adminTriggerDecaySweep;
 let wsConnection = null;
 
 function connectWebSocket() {
-    const wsUrl = window.location.protocol === 'https:'
-        ? `wss://${window.location.host}`
-        : (window.location.hostname === 'localhost' ? 'ws://localhost:8000' : `wss://${window.location.host}`);
+    const wsUrl = (window.location.hostname === 'roadhealth.onrender.com' || window.location.protocol === 'https:')
+        ? 'wss://roadhealth.onrender.com'
+        : 'ws://localhost:8000';
 
     try {
         wsConnection = new WebSocket(wsUrl);
@@ -633,13 +633,24 @@ function handleWebSocketMessage(msg) {
                 if (msg.data.lat && msg.data.lng) {
                     window.roadHealthMap.updateVehiclePosition(msg.data.lat, msg.data.lng);
                 }
+                if (msg.data.potholeTrigger) {
+                    toggleHazardPins(true);
+                }
             }
             break;
 
         case 'pothole:detected':
             if (msg.data) {
                 toggleHazardPins(true);
-                speakHazardWarning(`Warning: Pothole detected ahead with IRI ${msg.data.iri?.toFixed(1) || '6.0'}`);
+                if (window.roadHealthAPI && window.roadHealthMap) {
+                    window.roadHealthAPI.getPotholeTelemetry().then(potholes => {
+                        window.roadHealthMap.renderPotholes(potholes, true);
+                    });
+                }
+                speakHazardWarning(`Warning: Pothole detected ahead with IRI ${msg.data.iri ? parseFloat(msg.data.iri).toFixed(1) : '6.0'}`);
+                if (AppState.originPoint && AppState.destPoint) {
+                    calculateAndRenderLiveRoutes(AppState.originPoint, AppState.destPoint);
+                }
             }
             break;
 
