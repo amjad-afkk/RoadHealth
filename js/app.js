@@ -648,6 +648,9 @@ function handleWebSocketMessage(msg) {
             if (msg.data && msg.data.id && window.roadHealthMap) {
                 window.roadHealthMap.removePotholeMarker(msg.data.id);
             }
+            if (AppState.originPoint && AppState.destPoint) {
+                calculateAndRenderLiveRoutes(AppState.originPoint, AppState.destPoint);
+            }
             break;
     }
 }

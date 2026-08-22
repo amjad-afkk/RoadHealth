@@ -398,30 +398,37 @@ class RoadHealthMap {
 
         if (this.map) this.map.closePopup();
 
-        this.layers.routeGroup.eachLayer(layer => {
-            if (layer._segmentRef && layer.setStyle) {
-                const seg = layer._segmentRef;
-                const coords = seg.coords || [];
+        // Update BOTH active route group AND alternative routes group
+        const updateLayersInGroup = (group) => {
+            group.eachLayer(layer => {
+                if (layer._segmentRef && layer.setStyle) {
+                    const seg = layer._segmentRef;
+                    const coords = seg.coords || [];
 
-                let isNearRemoved = false;
-                if (removedLat !== null) {
-                    for (const pt of coords) {
-                        const d = Math.hypot(pt[0] - removedLat, pt[1] - removedLng) * 111320;
-                        if (d <= 40) {
-                            isNearRemoved = true;
-                            break;
+                    let isNearRemoved = false;
+                    if (removedLat !== null) {
+                        for (const pt of coords) {
+                            const d = Math.hypot(pt[0] - removedLat, pt[1] - removedLng) * 111320;
+                            if (d <= 40) {
+                                isNearRemoved = true;
+                                break;
+                            }
                         }
                     }
-                }
 
-                if (isNearRemoved || !this.hasAnyPotholeNearSegment(coords)) {
-                    seg.health = 'good';
-                    seg.potholeCount = 0;
-                    seg.iri = 1.1;
-                    layer.setStyle({ color: '#10B981' });
+                    if (isNearRemoved || !this.hasAnyPotholeNearSegment(coords)) {
+                        seg.health = 'good';
+                        seg.potholeCount = 0;
+                        seg.iri = 1.1;
+                        const isAlt = (group === this.layers.altRoutesGroup);
+                        layer.setStyle({ color: isAlt ? '#059669' : '#10B981' });
+                    }
                 }
-            }
-        });
+            });
+        };
+
+        updateLayersInGroup(this.layers.routeGroup);
+        updateLayersInGroup(this.layers.altRoutesGroup);
 
         if (typeof window.recalculateCurrentRouteSummary === 'function') {
             window.recalculateCurrentRouteSummary();
